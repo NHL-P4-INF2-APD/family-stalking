@@ -8,7 +8,7 @@
 Dit project is ontwikkeld als onderdeel van de opleiding Informatica aan NHL Stenden. Het doel is het realiseren van een mobiele Android-applicatie in teamverband met focus op softwarekwaliteit, agile werkwijze en samenwerking binnen een professionele ontwikkelomgeving.  
 
 De app wordt geschreven in **Kotlin** en richt zich op het bouwen van een Android-toepassing genaamd **Family Stalking**, beschikbaar via de volgende repository:  
-🔗 [Jira Project](https://student-team-app-development.atlassian.net/jira/software/projects/FS/list?selectedIssue=FS-16)
+🔗 [Jira Project](https://student-team-app-development.atlassian.net/jira/software/projects/FS/boards/1)
 
 ---
 
