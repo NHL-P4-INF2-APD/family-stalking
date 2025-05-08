@@ -56,10 +56,6 @@ replay_pid*
 # Google Services (e.g. APIs or Firebase)
 google-services.json
 
-# Version control
-.git/
-.github/
-
 # OS-specific files
 .DS_Store
 .DS_Store?
