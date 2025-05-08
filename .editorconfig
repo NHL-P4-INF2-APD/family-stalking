@@ -1,0 +1,39 @@
+# EditorConfig helps maintain consistent coding styles
+# https://editorconfig.org
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+max_line_length = 120
+tab_width = 2
+trim_trailing_whitespace = true
+ij_continuation_indent_size = 4
+
+[*.{kt,kts}]
+# Kotlin specific settings
+ij_kotlin_code_style_defaults = KOTLIN_OFFICIAL
+ij_kotlin_line_comment_at_first_column = false
+ij_kotlin_line_comment_add_space = true
+ij_kotlin_name_count_to_use_star_import = 2147483647
+ij_kotlin_name_count_to_use_star_import_for_members = 2147483647
+ij_kotlin_keep_blank_lines_in_declarations = 1
+ij_kotlin_keep_blank_lines_in_code = 1
+ij_kotlin_keep_blank_lines_before_right_brace = 0
+ij_kotlin_align_multiline_parameters = false
+ij_kotlin_align_multiline_extends_list = false
+ij_kotlin_align_multiline_method_parentheses = false
+ij_kotlin_align_multiline_chained_methods = false
+ij_kotlin_align_multiline_parameters_in_calls = false
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.{md,markdown}]
+trim_trailing_whitespace = false
