@@ -2,6 +2,7 @@
 
 <h1 align="center">
   <a href="https://www.nhlstenden.com/"><img src="nhl.png" alt="NHL Logo" height="150"></a>
+  <img src="logo.png" alt="Family Stalking Logo" height="150">
 </h1>
 
 ## Project Overview  
