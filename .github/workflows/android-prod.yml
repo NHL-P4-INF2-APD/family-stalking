@@ -52,7 +52,7 @@ jobs:
           cache: gradle
 
       - name: Run Tests with Coverage
-        run: ./gradlew test jacocoTestReport
+        run: ./gradlew coverage
 
       - name: Upload Test Reports
         if: always()
@@ -67,7 +67,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-reports
-          path: app/build/reports/jacoco/
+          path: |
+            app/build/reports/jacoco/generateCoverageReport/
+            app/build/reports/jacoco/test/
           if-no-files-found: warn
 
   build-and-release:

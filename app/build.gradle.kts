@@ -52,6 +52,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Disable Android's built-in JaCoCo integration
+            enableUnitTestCoverage = false
+            enableAndroidTestCoverage = false
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -63,10 +68,6 @@ android {
             } else {
                 signingConfigs.getByName("release")
             }
-        }
-        debug {
-            enableUnitTestCoverage = true
-            enableAndroidTestCoverage = true
         }
     }
     compileOptions {
@@ -100,42 +101,46 @@ jacoco {
     toolVersion = "0.8.11"
 }
 
-tasks.withType<Test> {
-    configure<JacocoTaskExtension> {
-        isIncludeNoLocationClasses = true
-        excludes = listOf("jdk.internal.*")
+// Configure JaCoCo agent
+tasks.withType<Test>().configureEach {
+    jacoco {
+        setExcludes(setOf("jdk.internal.*"))
     }
 }
 
-val jacocoTestReport = tasks.register<JacocoReport>("jacocoTestReport") {
-    dependsOn(tasks.named("testDebugUnitTest"))
+// Create a task to generate coverage report
+tasks.register<JacocoReport>("generateCoverageReport") {
+    dependsOn("testDebugUnitTest")
 
     reports {
         xml.required.set(true)
         html.required.set(true)
     }
 
-    val kotlinClasses = fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
-        exclude("**/R.class")
-        exclude("**/R\$*.class")
-        exclude("**/BuildConfig.*")
-        exclude("**/Manifest*.*")
-        exclude("**/*Test*.*")
-        exclude("android/**/*.*")
-    }
+    val excludes = setOf(
+        "**/R.class",
+        "**/R\$*.class",
+        "**/BuildConfig.*",
+        "**/Manifest*.*",
+        "**/*Test*.*",
+        "android/**/*.*"
+    )
 
-    val javaClasses = fileTree(layout.buildDirectory.dir("intermediates/javac/debug")) {
-        exclude("**/R.class")
-        exclude("**/R\$*.class")
-        exclude("**/BuildConfig.*")
-        exclude("**/Manifest*.*")
-        exclude("**/*Test*.*")
-        exclude("android/**/*.*")
+    val debugTree = fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug")) {
+        exclude(excludes)
     }
 
     val mainSrc = "${project.projectDir}/src/main/java"
+    val mainKotlin = "${project.projectDir}/src/main/kotlin"
 
-    sourceDirectories.setFrom(files(mainSrc))
-    classDirectories.setFrom(files(kotlinClasses, javaClasses))
-    executionData.setFrom(files(layout.buildDirectory.file("jacoco/testDebugUnitTest.exec")))
+    sourceDirectories.setFrom(files(mainSrc, mainKotlin))
+    classDirectories.setFrom(files(debugTree))
+    executionData.setFrom(fileTree(layout.buildDirectory) {
+        include("jacoco/testDebugUnitTest.exec")
+    })
+}
+
+// Alias task
+tasks.register("coverage") {
+    dependsOn("testDebugUnitTest", "generateCoverageReport")
 }
