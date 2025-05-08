@@ -71,5 +71,3 @@ Thumbs.db
 # Gradle wrapper (should be tracked)
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
-
-local.properties
