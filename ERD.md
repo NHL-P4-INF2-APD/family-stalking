@@ -8,8 +8,8 @@ erDiagram
         TIMESTAMP created_at
     }
     family_members {
-        VARCHAR user_id PK,FK1
-        VARCHAR famile_id PK,FK2
+        VARCHAR user_id PK,FK
+        VARCHAR famile_id PK,FK
         VARCHAR role
         TIMESTAMP joined_at
     }
@@ -28,8 +28,8 @@ erDiagram
         VARCHAR created_by FK
     }
     event_attendees {
-        VARCHAR event_id PK,FK1
-        VARCHAR user_id PK,FK2
+        VARCHAR event_id PK,FK
+        VARCHAR user_id PK,FK
         VARCHAR status
     }
     locations {
