@@ -9,6 +9,7 @@ detekt {
     buildUponDefaultConfig = true
     config.setFrom(files("$projectDir/config/detekt/detekt.yml"))
     parallel = true
+    autoCorrect = true
 }
 
 tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
@@ -18,4 +19,9 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
         txt.required.set(true)
         sarif.required.set(true)
     }
+    jvmTarget = "17"
+}
+
+tasks.register("clean", Delete::class) {
+    delete(rootProject.buildDir)
 }

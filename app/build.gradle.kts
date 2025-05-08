@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.jetbrainsKotlinAndroid)
     jacoco
+    id("io.gitlab.arturbosch.detekt")
 }
 
 // Load local.properties
@@ -20,14 +21,22 @@ android {
 
     signingConfigs {
         create("release") {
-            // These values are read from local.properties for local builds
-            // CI/CD uses GitHub Secrets instead
-            val keystoreFile = rootProject.file(localProperties.getProperty("keystore.file"))
-            if (keystoreFile.exists()) {
-                storeFile = keystoreFile
-                storePassword = System.getenv("KEY_STORE_PASSWORD") ?: localProperties.getProperty("keystore.password")
-                keyAlias = System.getenv("KEY_ALIAS") ?: localProperties.getProperty("key.alias")
-                keyPassword = System.getenv("KEY_PASSWORD") ?: localProperties.getProperty("key.password")
+            // CI environment check
+            if (System.getenv("CI") == "true") {
+                // CI/CD uses GitHub Secrets
+                storeFile = null // Will be handled by r0adkll/sign-android-release action
+                storePassword = System.getenv("KEY_STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                // Local development signing
+                val keystoreFilePath = localProperties.getProperty("keystore.file")
+                if (keystoreFilePath != null) {
+                    storeFile = rootProject.file(keystoreFilePath)
+                    storePassword = localProperties.getProperty("keystore.password")
+                    keyAlias = localProperties.getProperty("key.alias")
+                    keyPassword = localProperties.getProperty("key.password")
+                }
             }
         }
     }
@@ -49,7 +58,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (System.getenv("CI") != "true" && !localProperties.containsKey("keystore.file")) {
+                null
+            } else {
+                signingConfigs.getByName("release")
+            }
         }
         debug {
             enableUnitTestCoverage = true
