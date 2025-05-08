@@ -39,7 +39,7 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 }
 
 tasks.register("clean", Delete::class) {
-  delete(rootProject.buildDir)
+  delete(layout.buildDirectory)
 }
 
 // Add a task to check code style
