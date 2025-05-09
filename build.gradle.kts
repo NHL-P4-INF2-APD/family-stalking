@@ -29,6 +29,7 @@ detekt {
     allRules = false
     config.setFrom(files("$projectDir/config/detekt/detekt.yml"))
     baseline = file("$projectDir/config/detekt/baseline.xml")
+    
 }
 
 dependencies {
