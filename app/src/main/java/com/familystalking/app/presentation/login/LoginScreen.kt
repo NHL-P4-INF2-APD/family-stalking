@@ -37,7 +37,7 @@ fun LoginScreen(
     LaunchedEffect(navigateTo) {
         navigateTo?.let { route ->
             navController.navigate(route) {
-                popUpTo(Screen.Login.route) { inclusive = true }
+                popUpTo(Screen.Login.route)
             }
             viewModel.onNavigated()
         }

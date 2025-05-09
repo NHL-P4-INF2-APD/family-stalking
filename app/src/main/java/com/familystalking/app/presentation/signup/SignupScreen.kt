@@ -20,6 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.familystalking.app.R
 import com.familystalking.app.domain.model.AuthError
+import com.familystalking.app.presentation.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +38,7 @@ fun SignupScreen(
     LaunchedEffect(navigateTo) {
         navigateTo?.let { route ->
             navController.navigate(route) {
-                popUpTo(Screen.Login.route) { inclusive = true }
+                popUpTo(Screen.Login.route)
             }
             viewModel.onNavigated()
         }
