@@ -9,7 +9,7 @@ erDiagram
     }
     family_members {
         VARCHAR user_id PK,FK
-        VARCHAR famile_id PK,FK
+        VARCHAR family_id PK,FK
         VARCHAR role
         TIMESTAMP joined_at
     }
