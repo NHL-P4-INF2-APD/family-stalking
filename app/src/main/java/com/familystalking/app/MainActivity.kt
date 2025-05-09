@@ -11,6 +11,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.familystalking.app.presentation.forgotpassword.ForgotPasswordScreen
+import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.signup.SignupScreen
@@ -42,7 +43,7 @@ class MainActivity : ComponentActivity() {
                             ForgotPasswordScreen(navController)
                         }
                         composable(Screen.Home.route) {
-                            // TODO: Implement HomeScreen
+                            HomeScreen(navController)
                         }
                     }
                 }

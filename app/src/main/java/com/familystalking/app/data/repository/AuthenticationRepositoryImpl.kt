@@ -44,4 +44,13 @@ class AuthenticationRepositoryImpl @Inject constructor(
             AuthResult.Error(AuthError.InvalidEmail)
         }
     }
+
+    override suspend fun signOut(): AuthResult {
+        return try {
+            supabaseClient.auth.signOut()
+            AuthResult.Success
+        } catch (e: Exception) {
+            AuthResult.Error(AuthError.UnknownError)
+        }
+    }
 } 
