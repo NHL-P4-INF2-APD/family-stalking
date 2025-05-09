@@ -1,50 +1,21 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
 plugins {
-  alias(libs.plugins.androidApplication) apply false
-  alias(libs.plugins.jetbrainsKotlinAndroid) apply false
-  id("io.gitlab.arturbosch.detekt") version "1.23.4"
-  id("org.jlleitschuh.gradle.ktlint") version "11.6.1"
+    kotlin("jvm") version "2.1.10"
 }
 
-detekt {
-  buildUponDefaultConfig = true
-  config.setFrom(files("$projectDir/config/detekt/detekt.yml"))
-  parallel = true
-  autoCorrect = true
+group = "org.example"
+version = "1.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
 }
 
-ktlint {
-  version.set("1.0.1")
-  android.set(true)
-  verbose.set(true)
-  outputToConsole.set(true)
-  reporters {
-    reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.HTML)
-    reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.CHECKSTYLE)
-  }
-  filter {
-    exclude("**/generated/**")
-    include("**/kotlin/**")
-  }
+dependencies {
+    testImplementation(kotlin("test"))
 }
 
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-  reports {
-    html.required.set(true)
-    xml.required.set(true)
-    txt.required.set(true)
-    sarif.required.set(true)
-  }
-  jvmTarget = "17"
+tasks.test {
+    useJUnitPlatform()
 }
-
-tasks.register("clean", Delete::class) {
-  delete(layout.buildDirectory)
-}
-
-// Add a task to check code style
-tasks.register("checkCodeStyle") {
-  group = "verification"
-  description = "Run all code style checks"
-  dependsOn("ktlintCheck", "detekt")
+kotlin {
+    jvmToolchain(21)
 }
