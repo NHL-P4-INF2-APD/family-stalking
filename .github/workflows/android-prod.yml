@@ -17,7 +17,6 @@ jobs:
         with:
           java-version: "17"
           distribution: "temurin"
-          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -58,7 +57,6 @@ jobs:
         with:
           java-version: "17"
           distribution: "temurin"
-          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -94,13 +92,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for release notes generation
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
-          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -135,6 +134,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: app/build/outputs/apk/release/app-release.apk
-          body_path: ${{ github.workspace }}/CHANGELOG.md
+          generate_release_notes: true # This line enables auto-generation
           draft: false
           prerelease: false
