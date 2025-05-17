@@ -1,0 +1,23 @@
+---
+description: helpful for understanding code quality and formatting tools
+globs: 
+alwaysApply: false
+---
+# Code Quality and Formatting Tools
+
+This project uses `ktlint` for code formatting and `detekt` for static code analysis to maintain code quality and consistency.
+
+**Key Guidelines from [README.md](mdc:README.md):**
+- Indentation: 4 spaces
+- Line length: 120 characters
+- Kotlin official code style
+- No wildcard imports
+- Consistent naming conventions
+
+**Gradle Commands (from [README.md](mdc:README.md)):**
+- To manually check code style: `./gradlew checkCodeStyle`
+- To format code manually: `./gradlew ktlintFormat`
+
+Refer to the [README.md](mdc:README.md) for more details.
+The build configuration for these tools can be influenced by [build.gradle.kts](mdc:build.gradle.kts) and potentially `app/build.gradle.kts`.
+Detekt configuration is located in `config/detekt/` (e.g., `config/detekt/detekt.yml`).

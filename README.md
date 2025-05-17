@@ -53,41 +53,11 @@ De app wordt geschreven in **Kotlin** en richt zich op het bouwen van een Androi
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/family-stalking.git
+git clone https://github.com/NHL-P4-INF2-APD/family-stalking.git
 cd family-stalking
 ```
 
-### 2. Set Up Code Style Tools
-
-We use automated tools to maintain code quality and consistency. To set them up:
-
-#### On Windows:
-
-```cmd
-setup-hooks.bat
-```
-
-#### On macOS/Linux:
-
-```bash
-chmod +x setup-hooks.sh
-./setup-hooks.sh
-```
-
-This will install Git hooks that:
-
-- Format your code automatically before commits
-- Run code quality checks before commits
-- Verify all style checks before pushing
-
-To skip hooks temporarily (not recommended):
-
-```bash
-git commit --no-verify
-git push --no-verify
-```
-
-### 3. Code Style Guidelines
+### 2. Code Style Guidelines
 
 Our project enforces consistent code style through:
 
@@ -96,7 +66,7 @@ Our project enforces consistent code style through:
 
 The rules include:
 
-- 2-space indentation
+- 4-space indentation
 - 120 character line length
 - Kotlin official code style
 - No wildcard imports
