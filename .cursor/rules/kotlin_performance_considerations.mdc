@@ -1,0 +1,10 @@
+---
+description: helpful for understanding project Kotlin Performance Considerations
+globs: 
+alwaysApply: false
+---
+# Kotlin Performance Considerations
+
+*   The most efficient collection operations for each use case must be selected.
+*   Unnecessary object creation must be minimized.
+*   Code performance must be analyzed and optimized using profiling tools when necessary.

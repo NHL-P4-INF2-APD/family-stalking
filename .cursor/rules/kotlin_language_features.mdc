@@ -1,0 +1,15 @@
+---
+description: helpful for understanding project Required Kotlin Language Feature Usage
+globs: 
+alwaysApply: false
+---
+# Required Kotlin Language Feature Usage
+
+*   Prioritize immutable variables using `val`. `var` usage requires explicit justification.
+*   Utilize `data class` for data-holding classes. Manual implementation of `equals()`, `hashCode()`, `toString()`, `copy()`, or `componentN()` for data classes is prohibited.
+*   Employ `sealed class` for restricted class hierarchies to enable exhaustive `when` expressions.
+*   Use extension functions for adding functionality without modifying existing classes.
+*   Utilize higher-order functions and lambdas for concise and expressive code, particularly with collections.
+*   The `when` expression must be used over multiple `if-else if` statements for handling multiple conditions.
+*   Explicitly handle nullability using nullable types (`?`), safe call operator (`?.`), elvis operator (`?:`), `requireNotNull`, or `checkNotNull`. The non-null assertion operator (`!!`) is forbidden unless accompanied by documented, unavoidable rationale.
+*   Coroutine usage is the standard for asynchronous operations and concurrency management.
