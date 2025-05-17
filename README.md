@@ -66,7 +66,7 @@ Our project enforces consistent code style through:
 
 The rules include:
 
-- 2-space indentation
+- 4-space indentation
 - 120 character line length
 - Kotlin official code style
 - No wildcard imports
