@@ -10,9 +10,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.familystalking.app.presentation.navigation.BottomNavBar
@@ -95,14 +97,7 @@ fun SettingsScreen(
                 }
             }
 
-            // Privacy section
-            Text(
-                text = "Privacy",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
-            )
-
+            // All settings in one card
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -115,118 +110,125 @@ fun SettingsScreen(
                     defaultElevation = 0.dp
                 )
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .padding(vertical = 8.dp)
                 ) {
+                    // Privacy section
                     Text(
-                        text = "Location sharing",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Privacy",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp) // Reduced vertical padding
                     )
 
-                    Switch(
-                        checked = locationSharing,
-                        onCheckedChange = { viewModel.toggleLocationSharing() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = MaterialTheme.colorScheme.primary,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp), // Reduced vertical padding
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Location sharing",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp
                         )
+
+                        Switch(
+                            checked = locationSharing,
+                            onCheckedChange = { viewModel.toggleLocationSharing() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.scale(0.65f)
+                        )
+                    }
+
+                    Divider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = Color(0xFFEEEEEE)
                     )
-                }
-            }
 
-            // Notifications section
-            Text(
-                text = "Notifications",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
-            )
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = 0.dp
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                    // Notifications section
                     Text(
-                        text = "Push notifications",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Notifications",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp) // Reduced vertical padding
                     )
 
-                    Switch(
-                        checked = pushNotifications,
-                        onCheckedChange = { viewModel.togglePushNotifications() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = MaterialTheme.colorScheme.primary,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp), // Reduced vertical padding
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Push notifications",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp
                         )
+
+                        Switch(
+                            checked = pushNotifications,
+                            onCheckedChange = { viewModel.togglePushNotifications() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.scale(0.65f)
+                        )
+                    }
+
+                    Divider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        color = Color(0xFFEEEEEE)
                     )
-                }
-            }
 
-            // Map settings section
-            Text(
-                text = "Map settings",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp)
-            )
-
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 16.dp),
-                shape = RoundedCornerShape(8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                elevation = CardDefaults.cardElevation(
-                    defaultElevation = 0.dp
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                    // Map settings section
                     Text(
-                        text = "Show battery percentage",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Map settings",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp) // Reduced vertical padding
                     )
 
-                    Switch(
-                        checked = showBatteryPercentage,
-                        onCheckedChange = { viewModel.toggleShowBatteryPercentage() },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color.White,
-                            checkedTrackColor = MaterialTheme.colorScheme.primary,
-                            uncheckedThumbColor = Color.White,
-                            uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 2.dp), // Reduced vertical padding
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Show battery percentage",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 14.sp
                         )
-                    )
+
+                        Switch(
+                            checked = showBatteryPercentage,
+                            onCheckedChange = { viewModel.toggleShowBatteryPercentage() },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = Color.Gray.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier.scale(0.65f)
+                        )
+                    }
                 }
             }
 
@@ -266,8 +268,6 @@ fun SettingsScreen(
                 }
             }
         }
-
-        // Bottom Navigation Bar
         BottomNavBar(
             currentRoute = Screen.Settings.route,
             navController = navController
