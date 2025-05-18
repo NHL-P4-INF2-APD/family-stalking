@@ -19,6 +19,7 @@ import com.familystalking.app.presentation.MainViewModel
 import com.familystalking.app.presentation.forgotpassword.ForgotPasswordScreen
 import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
+import com.familystalking.app.presentation.map.MapScreen
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.signup.SignupScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
@@ -45,7 +46,7 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(sessionState) {
                         when (sessionState) {
                             SessionState.Authenticated -> {
-                                navController.navigate(Screen.Home.route) {
+                                navController.navigate(Screen.Map.route) {
                                     popUpTo(Screen.Login.route) { inclusive = true }
                                 }
                             }
@@ -76,9 +77,25 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Home.route) {
                             HomeScreen(navController)
                         }
+                        composable(Screen.Map.route) {
+                            MapScreen(navController)
+                        }
+                        // Add other routes for the bottom navigation
+                        composable(Screen.Agenda.route) {
+                            // Placeholder for Agenda screen
+                            HomeScreen(navController) // Temporarily using HomeScreen
+                        }
+                        composable(Screen.Family.route) {
+                            // Placeholder for Family screen
+                            HomeScreen(navController) // Temporarily using HomeScreen
+                        }
+                        composable(Screen.Settings.route) {
+                            // Placeholder for Settings screen
+                            HomeScreen(navController) // Temporarily using HomeScreen
+                        }
                     }
                 }
             }
         }
     }
-} 
+}

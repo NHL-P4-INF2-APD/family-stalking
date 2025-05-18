@@ -44,15 +44,15 @@ class LoginViewModel @Inject constructor(
 
     fun onSignIn() {
         if (!validateInput()) return
-        
+
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
-            
+
             when (val result = authenticationRepository.signIn(_email.value ?: "", _password.value ?: "")) {
                 is AuthResult.Success -> {
                     _isLoading.value = false
-                    _navigateTo.value = Screen.Home.route
+                    _navigateTo.value = Screen.Map.route
                 }
                 is AuthResult.Error -> {
                     _error.value = result.error
@@ -106,4 +106,4 @@ class LoginViewModel @Inject constructor(
     fun onNavigated() {
         _navigateTo.value = null
     }
-} 
+}
