@@ -21,6 +21,7 @@ import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
 import com.familystalking.app.presentation.map.MapScreen
 import com.familystalking.app.presentation.navigation.Screen
+import com.familystalking.app.presentation.settings.SettingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -80,18 +81,16 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Map.route) {
                             MapScreen(navController)
                         }
-                        // Add other routes for the bottom navigation
                         composable(Screen.Agenda.route) {
-                            // Placeholder for Agenda screen
-                            HomeScreen(navController) // Temporarily using HomeScreen
+
+                            HomeScreen(navController)
                         }
                         composable(Screen.Family.route) {
-                            // Placeholder for Family screen
-                            HomeScreen(navController) // Temporarily using HomeScreen
+
+                            HomeScreen(navController)
                         }
                         composable(Screen.Settings.route) {
-                            // Placeholder for Settings screen
-                            HomeScreen(navController) // Temporarily using HomeScreen
+                            SettingsScreen(navController)
                         }
                     }
                 }
