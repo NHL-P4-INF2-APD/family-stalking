@@ -5,6 +5,10 @@ sealed class Screen(val route: String) {
     object Signup : Screen("signup")
     object ForgotPassword : Screen("forgot_password")
     object Home : Screen("home")
+    object Map : Screen("map")
+    object Agenda : Screen("agenda")
+    object Family : Screen("family")
+    object Settings : Screen("settings")
 
     companion object {
         fun fromRoute(route: String?): Screen {
@@ -13,8 +17,12 @@ sealed class Screen(val route: String) {
                 Signup.route -> Signup
                 ForgotPassword.route -> ForgotPassword
                 Home.route -> Home
+                Map.route -> Map
+                Agenda.route -> Agenda
+                Family.route -> Family
+                Settings.route -> Settings
                 else -> Login
             }
         }
     }
-} 
+}
