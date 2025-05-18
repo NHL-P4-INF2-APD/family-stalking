@@ -1,0 +1,12 @@
+---
+description: helpful for understanding project Mandatory Kotlin Project Structure and Organization
+globs: 
+alwaysApply: false
+---
+# Mandatory Kotlin Project Structure and Organization
+
+*   Code must be organized into logical modules based on functionality or domain.
+*   Strict adherence to standard package naming conventions (lowercase, no underscores).
+*   Files must be kept concise to improve navigation and comprehension.
+
+Refer to [main_directory_structure_guide.mdc](mdc:.cursor/rules/main_directory_structure_guide.mdc) for an overview of this project's structure.

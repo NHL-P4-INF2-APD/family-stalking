@@ -1,0 +1,29 @@
+---
+description: helpful for understanding project directory structure
+globs: 
+alwaysApply: false
+---
+# Main Directory Structure Guide
+
+This guide outlines key directories in the "Family Stalking" Android project.
+
+- **`app/`**: Main application module.
+    - **`app/src/main/java/com/familystalking/app/`**: Kotlin source code.
+        - `data/`: Data layer (repositories, data sources).
+        - `di/`: Dependency injection.
+        - `domain/`: Domain layer (use cases, models).
+        - `presentation/`: UI layer (ViewModels, UI components).
+        - `ui/theme/`: App themes and UI styling.
+    - **`app/src/main/res/`**: Android resources.
+        - `drawable/`: Image and icon resources.
+        - `mipmap-*/`: Launcher icons.
+        - `values/`: Strings, colors, styles.
+- **`.github/workflows/`**: GitHub Actions CI/CD workflows.
+- **`config/detekt/`**: Detekt static analysis configuration (e.g., `detekt.yml`).
+- **`gradle/wrapper/`**: Gradle wrapper files.
+- **[build.gradle.kts](mdc:build.gradle.kts)**: Root Gradle build script.
+- **`app/build.gradle.kts`**: App module Gradle build script (typically).
+- **[settings.gradle.kts](mdc:settings.gradle.kts)**: Gradle settings, defines modules.
+- **[README.md](mdc:README.md)**: Main project documentation.
+
+For detailed Kotlin package structure, explore `app/src/main/java/com/familystalking/app/`.
