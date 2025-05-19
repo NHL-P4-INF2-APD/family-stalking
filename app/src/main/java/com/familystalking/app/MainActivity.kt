@@ -23,6 +23,8 @@ import com.familystalking.app.presentation.map.mapScreen
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.settings.settingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
+import com.familystalking.app.presentation.family.FamilyScreen
+import com.familystalking.app.presentation.family.FamilyQrScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -86,8 +88,10 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController)
                         }
                         composable(Screen.Family.route) {
-
-                            HomeScreen(navController)
+                            FamilyScreen(navController)
+                        }
+                        composable(Screen.FamilyQr.route) {
+                            FamilyQrScreen(navController)
                         }
                         composable(Screen.Settings.route) {
                             settingsScreen(navController)

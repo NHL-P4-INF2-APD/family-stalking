@@ -122,6 +122,9 @@ dependencies {
     // Google Maps SDK and Compose integration
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.maps.android:maps-compose:2.11.4")
+
+    // ZXing dependency for QR-code generation
+    implementation("com.google.zxing:core:3.5.3")
 }
 
 detekt {

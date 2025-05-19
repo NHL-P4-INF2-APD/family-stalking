@@ -9,6 +9,7 @@ sealed class Screen(val route: String) {
     object Agenda : Screen("agenda")
     object Family : Screen("family")
     object Settings : Screen("settings")
+    object FamilyQr : Screen("family/qr")
 
     companion object {
         fun fromRoute(route: String?): Screen {
@@ -21,6 +22,7 @@ sealed class Screen(val route: String) {
                 Agenda.route -> Agenda
                 Family.route -> Family
                 Settings.route -> Settings
+                FamilyQr.route -> FamilyQr
                 else -> Login
             }
         }
