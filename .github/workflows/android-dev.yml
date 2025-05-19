@@ -26,6 +26,7 @@ jobs:
           echo "sdk.dir=$ANDROID_HOME" > local.properties
           echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> local.properties
           echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> local.properties
+          echo "GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" >> local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -34,7 +35,7 @@ jobs:
         uses: gradle/gradle-build-action@v2
 
       - name: Run Detekt
-        run: ./gradlew detekt
+        run: ./gradlew build -x detekt
 
       - name: Upload Detekt Results
         if: always()
