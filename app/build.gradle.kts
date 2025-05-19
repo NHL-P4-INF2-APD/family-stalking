@@ -34,6 +34,7 @@ android {
         
         buildConfigField("String", "SUPABASE_URL", "\"${properties.getProperty("SUPABASE_URL", "")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${properties.getProperty("SUPABASE_ANON_KEY", "")}\"")
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = properties.getProperty("GOOGLE_MAPS_API_KEY", "")
     }
 
     buildTypes {
@@ -117,6 +118,10 @@ dependencies {
 
     // Detekt
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:$detektVersion")
+
+    // Google Maps SDK and Compose integration
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.maps.android:maps-compose:2.11.4")
 }
 
 detekt {
