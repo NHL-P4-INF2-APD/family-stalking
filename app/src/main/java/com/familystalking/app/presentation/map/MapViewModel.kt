@@ -2,12 +2,10 @@ package com.familystalking.app.presentation.map
 
 import android.location.Location
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,7 +20,7 @@ class MapViewModel @Inject constructor() : ViewModel() {
     private val _userStatus = MutableStateFlow("Driving")
     val userStatus: StateFlow<String> = _userStatus.asStateFlow()
 
-    fun updateLocation(location: Location) {
+    fun updateLocation(location: Location?) {
         _userLocation.value = location
     }
 
