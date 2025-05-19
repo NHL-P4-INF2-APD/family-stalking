@@ -1,62 +1,48 @@
 package com.familystalking.app.presentation.map
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.familystalking.app.presentation.navigation.BottomNavBar
+import com.familystalking.app.presentation.navigation.bottomNavBar
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.GoogleMap
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.rememberCameraPositionState
+
+private const val DEFAULT_LATITUDE = 52.3676
+private const val DEFAULT_LONGITUDE = 4.9041
+private const val DEFAULT_ZOOM = 12f
 
 @Composable
-fun MapScreen(navController: NavController) {
+fun mapScreen(navController: NavController) {
+    val amsterdam = LatLng(DEFAULT_LATITUDE, DEFAULT_LONGITUDE)
+    val cameraPositionState = rememberCameraPositionState {
+        position = com.google.android.gms.maps.model.CameraPosition.fromLatLngZoom(amsterdam, DEFAULT_ZOOM)
+    }
     Column(
         modifier = Modifier.fillMaxSize()
     ) {
-        // Map placeholder - this will be replaced with actual Google Maps implementation
         Box(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .background(Color(0xFFE8F0E9))
         ) {
-            // Placeholder for the map
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            GoogleMap(
+                modifier = Modifier.matchParentSize(),
+                cameraPositionState = cameraPositionState
             ) {
-                Text(
-                    text = "Google Maps",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = "Map will be displayed here once API key is configured",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                Marker(
+                    state = com.google.maps.android.compose.MarkerState(position = amsterdam),
+                    title = "Amsterdam",
+                    snippet = "Marker in Amsterdam"
                 )
             }
         }
-
-        // Bottom Navigation Bar
-        BottomNavBar(
+        bottomNavBar(
             currentRoute = "map",
             navController = navController
         )

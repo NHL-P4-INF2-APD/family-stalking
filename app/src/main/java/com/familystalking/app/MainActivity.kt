@@ -19,9 +19,9 @@ import com.familystalking.app.presentation.MainViewModel
 import com.familystalking.app.presentation.forgotpassword.ForgotPasswordScreen
 import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
-import com.familystalking.app.presentation.map.MapScreen
+import com.familystalking.app.presentation.map.mapScreen
 import com.familystalking.app.presentation.navigation.Screen
-import com.familystalking.app.presentation.settings.SettingsScreen
+import com.familystalking.app.presentation.settings.settingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController)
                         }
                         composable(Screen.Map.route) {
-                            MapScreen(navController)
+                            mapScreen(navController)
                         }
                         composable(Screen.Agenda.route) {
 
@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController)
                         }
                         composable(Screen.Settings.route) {
-                            SettingsScreen(navController)
+                            settingsScreen(navController)
                         }
                     }
                 }

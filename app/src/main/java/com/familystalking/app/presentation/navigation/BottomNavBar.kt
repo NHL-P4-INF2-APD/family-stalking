@@ -1,6 +1,5 @@
 package com.familystalking.app.presentation.navigation
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Icon
@@ -14,21 +13,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.familystalking.app.presentation.navigation.NavItem
+
+private val NAV_BAR_HEIGHT = 64.dp
+private val PURE_WHITE = Color(0xFFFFFFFF)
 
 @Composable
-fun BottomNavBar(
+fun bottomNavBar(
     currentRoute: String,
     navController: NavController
 ) {
-    // Pure white color for the navigation bar
-    val pureWhite = Color(0xFFFFFFFF)
-
     NavigationBar(
         modifier = Modifier
             .fillMaxWidth()
-            .height(64.dp),
-        containerColor = pureWhite,
+            .height(NAV_BAR_HEIGHT),
+        containerColor = PURE_WHITE,
         contentColor = MaterialTheme.colorScheme.primary,
         tonalElevation = 0.dp // Remove any elevation shadow that might affect color
     ) {
@@ -61,7 +59,7 @@ fun BottomNavBar(
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = MaterialTheme.colorScheme.primary,
                     selectedTextColor = MaterialTheme.colorScheme.primary,
-                    indicatorColor = pureWhite,
+                    indicatorColor = PURE_WHITE,
                     unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                     unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
