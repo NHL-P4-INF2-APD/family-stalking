@@ -33,41 +33,54 @@ fun FamilyQrScreen(
     userName: String = "Bert",
     userId: String = "Bert"
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(24.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "My QR Code",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
             }
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             Text(
-                text = "My QR Code",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                text = userName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            QRCodeBox(data = userId)
+            Spacer(modifier = Modifier.height(48.dp))
+            Text(
+                text = "Have friends scan this code to add you as a contact",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            com.familystalking.app.presentation.navigation.bottomNavBar(
+                currentRoute = com.familystalking.app.presentation.navigation.Screen.Family.route,
+                navController = navController
             )
         }
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(
-            text = userName,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        QRCodeBox(data = userId)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Have friends scan this code to add you as a contact",
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.Gray,
-            textAlign = TextAlign.Center
-        )
     }
 }
 

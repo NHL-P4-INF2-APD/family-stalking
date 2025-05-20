@@ -98,9 +98,18 @@ fun FamilyScreen(
             contentColor = Color.White,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(24.dp)
+                .padding(end = 24.dp, bottom = 88.dp)
         ) {
             Icon(Icons.Default.QrCode, contentDescription = "Show QR")
+        }
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+        ) {
+            com.familystalking.app.presentation.navigation.bottomNavBar(
+                currentRoute = Screen.Family.route,
+                navController = navController
+            )
         }
     }
 } 
