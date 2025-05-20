@@ -74,6 +74,9 @@ android {
 }
 
 dependencies {
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
     val composeBomVersion = "2024.02.00"
     val hiltVersion = "2.50"
     val supabaseVersion = "2.1.3"
@@ -125,6 +128,9 @@ dependencies {
 
     // ZXing dependency for QR-code generation
     implementation("com.google.zxing:core:3.5.3")
+
+    // Accompanist Permissions
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 }
 
 detekt {

@@ -26,13 +26,16 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 
 @Composable
 fun FamilyQrScreen(
     navController: NavController,
-    userName: String = "Bert",
-    userId: String = "Bert"
+    viewModel: FamilyViewModel = hiltViewModel()
 ) {
+    val currentUser by viewModel.currentUser.collectAsState()
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -58,12 +61,12 @@ fun FamilyQrScreen(
             }
             Spacer(modifier = Modifier.height(32.dp))
             Text(
-                text = userName,
+                text = currentUser?.name ?: "...",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(16.dp))
-            QRCodeBox(data = userId)
+            QRCodeBox(data = currentUser?.name ?: "...")
             Spacer(modifier = Modifier.height(48.dp))
             Text(
                 text = "Have friends scan this code to add you as a contact",

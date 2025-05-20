@@ -3,12 +3,15 @@ package com.familystalking.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
@@ -25,8 +28,13 @@ import com.familystalking.app.presentation.settings.settingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
 import com.familystalking.app.presentation.family.FamilyScreen
 import com.familystalking.app.presentation.family.FamilyQrScreen
+import com.familystalking.app.presentation.family.CameraScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -41,6 +49,7 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val viewModel: MainViewModel = hiltViewModel()
                     val sessionState by viewModel.sessionState.collectAsState()
+                    val snackbarHostState = remember { SnackbarHostState() }
 
                     LaunchedEffect(Unit) {
                         viewModel.checkSession()
@@ -95,6 +104,24 @@ class MainActivity : ComponentActivity() {
                         }
                         composable(Screen.Settings.route) {
                             settingsScreen(navController)
+                        }
+                        composable("camera_placeholder") {
+                            val scannedCode = remember { mutableStateOf<String?>(null) }
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                CameraScreen(
+                                    onQrScanned = { scannedCode.value = it },
+                                    navController = navController
+                                )
+                                if (scannedCode.value != null) {
+                                    SnackbarHost(
+                                        hostState = snackbarHostState,
+                                        modifier = Modifier.align(Alignment.BottomCenter)
+                                    )
+                                    LaunchedEffect(scannedCode.value) {
+                                        snackbarHostState.showSnackbar("QR Code: ${scannedCode.value}")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
