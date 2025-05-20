@@ -74,6 +74,9 @@ android {
 }
 
 dependencies {
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
     val composeBomVersion = "2024.02.00"
     val hiltVersion = "2.50"
     val supabaseVersion = "2.1.3"
@@ -122,6 +125,12 @@ dependencies {
     // Google Maps SDK and Compose integration
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.maps.android:maps-compose:2.11.4")
+
+    // ZXing dependency for QR-code generation
+    implementation("com.google.zxing:core:3.5.3")
+
+    // Accompanist Permissions
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 }
 
 detekt {

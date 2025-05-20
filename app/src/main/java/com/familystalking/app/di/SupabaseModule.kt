@@ -32,4 +32,11 @@ object SupabaseModule {
     fun provideAuthenticationRepository(
         supabaseClient: SupabaseClient
     ): AuthenticationRepository = AuthenticationRepositoryImpl(supabaseClient)
+
+    @Provides
+    @Singleton
+    fun provideFamilyRepository(
+        supabaseClient: SupabaseClient
+    ): com.familystalking.app.domain.repository.FamilyRepository =
+        com.familystalking.app.data.repository.FamilyRepositoryImpl(supabaseClient)
 } 
