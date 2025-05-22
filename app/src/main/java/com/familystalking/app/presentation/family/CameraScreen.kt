@@ -31,14 +31,14 @@ import com.google.accompanist.permissions.rememberPermissionState
 import com.google.zxing.*
 import com.google.zxing.common.HybridBinarizer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.navigation.NavController
 import java.util.concurrent.Executors
+import android.net.Uri
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = null) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
     var scannedCode by remember { mutableStateOf<String?>(null) }
@@ -56,7 +56,10 @@ fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = 
                 onClick = { navController.popBackStack() },
                 modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back"
+                )
             }
         }
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
