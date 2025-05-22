@@ -29,7 +29,7 @@ class FamilyRepositoryImpl @Inject constructor(
             val users = response.decodeList<FamilyMemberSupabase>()
             val user = users.firstOrNull()
             if (user != null) {
-                FamilyMember(user.name ?: "Unknown", user.status ?: "")
+                FamilyMember(user.name, user.status ?: "")
             } else {
                 FamilyMember("Unknown", "")
             }
