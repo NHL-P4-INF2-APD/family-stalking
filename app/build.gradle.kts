@@ -7,7 +7,7 @@ plugins {
     kotlin("plugin.serialization") version "1.9.22"
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
     id("com.google.dagger.hilt.android")
-    id("io.gitlab.arturbosch.detekt")
+    id("io.gitlab.arturbosch.detekt") version "1.23.5"
     id("jacoco")
 }
 
