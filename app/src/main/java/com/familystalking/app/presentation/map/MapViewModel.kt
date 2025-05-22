@@ -109,7 +109,7 @@ class MapViewModel @Inject constructor(
                 state.copy(
                     currentUserLocation = com.familystalking.app.domain.model.Location(
                         id = UUID.randomUUID(),
-                        userId = locationRepository.getAuthenticatedUserId(), // Retrieve the actual user ID from Supabase
+                        userId = locationRepository.getAuthenticatedUserId() ?: throw IllegalStateException("User ID not found during location update"),
                         latitude = location.latitude,
                         longitude = location.longitude,
                         timestamp = Instant.now()

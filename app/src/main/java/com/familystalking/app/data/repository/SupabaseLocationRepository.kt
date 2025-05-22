@@ -90,6 +90,13 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
             ?.name ?: "Unknown"
     }
 
+    override suspend fun getAuthenticatedUserId(): UUID? {
+        return supabaseClient.auth.currentUserOrNull()?.id?.let {
+            UUID.fromString(it)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun getFamilyMembersLocations(): Flow<List<FamilyMemberLocation>> = flow {
         val familyMembersLocations = supabaseClient.postgrest["locations"]
             .select(Columns.list("user_id", "latitude", "longitude", "timestamp")) {
@@ -97,13 +104,15 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
             }
             .decodeList<LocationRow>()
             .groupBy { it.userId }
-            .map { (userId, locations) ->
+            .mapNotNull { (userId, locations) ->
                 val latestLocation = locations.maxByOrNull { Instant.parse(it.timestamp) }
-                FamilyMemberLocation(
-                    userId = userId,
-                    name = getFamilyMemberName(userId),
-                    location = latestLocation?.toDomain()
-                )
+                latestLocation?.let {
+                    FamilyMemberLocation(
+                        userId = userId,
+                        name = getFamilyMemberName(userId),
+                        location = it.toDomain()
+                    )
+                }
             }
         emit(familyMembersLocations)
     }

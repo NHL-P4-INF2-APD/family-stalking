@@ -21,4 +21,9 @@ interface LocationRepository {
      * This will emit new values whenever any family member's location changes
      */
     fun getFamilyMembersLocations(): Flow<List<FamilyMemberLocation>>
+
+    /**
+     * Gets the currently authenticated user's ID
+     */
+    suspend fun getAuthenticatedUserId(): UUID?
 } 
