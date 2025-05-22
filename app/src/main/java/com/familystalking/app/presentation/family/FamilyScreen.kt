@@ -25,6 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.ui.theme.PrimaryGreen
+import com.familystalking.app.presentation.navigation.bottomNavBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,9 +33,9 @@ fun FamilyScreen(
     navController: NavController,
     viewModel: FamilyViewModel = hiltViewModel()
 ) {
-    val familyMembers by viewModel.familyMembers.collectAsState()
+    val state by viewModel.state.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
-    val filteredMembers = familyMembers.filter {
+    val filteredMembers = state.familyMembers.filter {
         it.name.contains(searchQuery, ignoreCase = true)
     }
 
@@ -128,7 +129,7 @@ fun FamilyScreen(
             Icon(Icons.Default.QrCode, contentDescription = "Show QR")
         }
         FloatingActionButton(
-            onClick = { navController.navigate("camera_placeholder") },
+            onClick = { navController.navigate(Screen.Camera.route) },
             containerColor = PrimaryGreen,
             contentColor = Color.White,
             modifier = Modifier
@@ -137,11 +138,10 @@ fun FamilyScreen(
         ) {
             Icon(Icons.Filled.CameraAlt, contentDescription = "Scan QR")
         }
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
+        Box(
+            modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            com.familystalking.app.presentation.navigation.bottomNavBar(
+            bottomNavBar(
                 currentRoute = Screen.Family.route,
                 navController = navController
             )

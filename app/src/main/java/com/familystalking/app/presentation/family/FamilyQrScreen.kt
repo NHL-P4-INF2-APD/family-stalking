@@ -11,15 +11,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import com.familystalking.app.ui.theme.PrimaryGreen
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.ImageBitmap
@@ -35,7 +29,10 @@ fun FamilyQrScreen(
     navController: NavController,
     viewModel: FamilyViewModel = hiltViewModel()
 ) {
-    val currentUser by viewModel.currentUser.collectAsState()
+    val state by viewModel.state.collectAsState()
+    val currentUser = state.currentUser
+    val currentUserId = state.currentUserId
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -70,7 +67,15 @@ fun FamilyQrScreen(
                 fontWeight = FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(16.dp))
-            QRCodeBox(data = currentUser?.name ?: "...")
+            
+            // Create QR code data with both user ID and name
+            val qrData = if (currentUserId != null && currentUser != null) {
+                "$currentUserId|${currentUser.name}"
+            } else {
+                "..."
+            }
+            
+            QRCodeBox(data = qrData)
             Spacer(modifier = Modifier.height(48.dp))
             Text(
                 text = "Have friends scan this code to add you as a contact",
