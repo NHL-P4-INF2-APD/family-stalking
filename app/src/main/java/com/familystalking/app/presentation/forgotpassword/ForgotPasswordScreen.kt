@@ -36,7 +36,6 @@ import androidx.navigation.NavController
 import com.familystalking.app.R
 import com.familystalking.app.domain.model.AuthError
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ForgotPasswordScreen(
     navController: NavController,

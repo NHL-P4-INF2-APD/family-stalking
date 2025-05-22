@@ -39,7 +39,6 @@ import com.familystalking.app.R
 import com.familystalking.app.domain.model.AuthError
 import com.familystalking.app.presentation.navigation.Screen
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignupScreen(
     navController: NavController,
