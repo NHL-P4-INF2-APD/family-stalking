@@ -2,12 +2,11 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
-    id("com.google.dagger.hilt.android")
+    kotlin("android")
+    kotlin("kapt")
     kotlin("plugin.serialization") version "1.9.22"
-    id("io.gitlab.arturbosch.detekt")
-    id("jacoco")
+    id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -74,17 +73,18 @@ android {
 }
 
 dependencies {
-    implementation("androidx.camera:camera-core:1.4.2")
-    implementation("androidx.camera:camera-lifecycle:1.4.2")
-    implementation("androidx.camera:camera-view:1.4.2")
     val composeBomVersion = "2024.02.00"
     val hiltVersion = "2.50"
     val supabaseVersion = "2.1.3"
-    val detektVersion = "1.23.5"
+    val lifecycleVersion = "2.7.0"
+    val cameraxVersion = "1.3.1"
 
     implementation(platform("androidx.compose:compose-bom:$composeBomVersion"))
     implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:$lifecycleVersion")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:$lifecycleVersion")
     implementation("androidx.activity:activity-compose:1.8.2")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -100,15 +100,43 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:compose-auth-ui")
     implementation("io.github.jan-tennert.supabase:compose-auth")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.github.jan-tennert.supabase:realtime-kt")
+    implementation("io.github.jan-tennert.supabase:functions-kt")
+    implementation("io.github.jan-tennert.supabase:storage-kt")
     implementation("io.ktor:ktor-client-android:2.3.8")
+    implementation("io.ktor:ktor-client-core:2.3.8")
+    implementation("io.ktor:ktor-client-cio:2.3.8")
 
     // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
 
     // Hilt
     implementation("com.google.dagger:hilt-android:$hiltVersion")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
     kapt("com.google.dagger:hilt-android-compiler:$hiltVersion")
+
+    // Coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+
+    // Google Maps and Location
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+    implementation("com.google.maps.android:maps-compose:4.3.0")
+
+    // CameraX
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+
+    // ZXing (Barcode/QR scanning)
+    implementation("com.google.zxing:core:3.5.3")
+
+    // Accompanist
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
@@ -118,73 +146,4 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
-
-    // Detekt
-    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:$detektVersion")
-
-    // Google Maps SDK and Compose integration
-    implementation("com.google.android.gms:play-services-maps:18.2.0")
-    implementation("com.google.maps.android:maps-compose:2.11.4")
-
-    // ZXing dependency for QR-code generation
-    implementation("com.google.zxing:core:3.5.3")
-
-    // Accompanist Permissions
-    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
-}
-
-detekt {
-    buildUponDefaultConfig = true
-    allRules = false
-    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
-    baseline = file("$rootDir/config/detekt/baseline.xml")
-}
-
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
-    reports {
-        html.required.set(true)
-        xml.required.set(true)
-        txt.required.set(false)
-        sarif.required.set(true)
-    }
-}
-
-tasks.withType<Test> {
-    configure<JacocoTaskExtension> {
-        isIncludeNoLocationClasses = true
-        excludes = listOf("jdk.internal.*")
-    }
-}
-
-tasks.register<JacocoReport>("coverage") {
-    dependsOn("testDebugUnitTest")
-
-    reports {
-        xml.required.set(true)
-        html.required.set(true)
-        csv.required.set(false)
-    }
-
-    val fileFilter = listOf(
-        "**/R.class",
-        "**/R$*.class",
-        "**/BuildConfig.*",
-        "**/Manifest*.*",
-        "**/*Test*.*",
-        "android/**/*.*",
-        "**/*\$Lambda$*.*", // Jacoco can not handle several "$" in class names
-        "**/*\$inlined$*.*" // Kotlin specific, Jacoco can not handle several "$" in class names
-    )
-
-    val debugTree = fileTree("${project.buildDir}/tmp/kotlin-classes/debug") {
-        exclude(fileFilter)
-    }
-
-    val mainSrc = "${project.projectDir}/src/main/kotlin"
-
-    sourceDirectories.setFrom(files(mainSrc))
-    classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(fileTree(project.buildDir) {
-        include("jacoco/testDebugUnitTest.exec")
-    })
 }
