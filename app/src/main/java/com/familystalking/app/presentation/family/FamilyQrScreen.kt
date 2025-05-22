@@ -35,7 +35,10 @@ fun FamilyQrScreen(
     navController: NavController,
     viewModel: FamilyViewModel = hiltViewModel()
 ) {
-    val currentUser by viewModel.currentUser.collectAsState()
+    val state by viewModel.state.collectAsState()
+    val currentUser = state.currentUser
+    val currentUserId = state.currentUserId
+    
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -70,7 +73,15 @@ fun FamilyQrScreen(
                 fontWeight = FontWeight.Medium
             )
             Spacer(modifier = Modifier.height(16.dp))
-            QRCodeBox(data = currentUser?.name ?: "...")
+            
+            // Create QR code data with both user ID and name
+            val qrData = if (currentUserId != null && currentUser != null) {
+                "$currentUserId|${currentUser.name}"
+            } else {
+                "..."
+            }
+            
+            QRCodeBox(data = qrData)
             Spacer(modifier = Modifier.height(48.dp))
             Text(
                 text = "Have friends scan this code to add you as a contact",

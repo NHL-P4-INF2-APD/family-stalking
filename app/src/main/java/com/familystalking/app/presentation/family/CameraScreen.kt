@@ -8,15 +8,8 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,14 +27,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.navigation.NavController
 import java.util.concurrent.Executors
-import android.net.Uri
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.familystalking.app.ui.theme.PrimaryGreen
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = null) {
+fun CameraScreen(
+    navController: NavController? = null,
+    viewModel: FamilyViewModel = hiltViewModel()
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
     var scannedCode by remember { mutableStateOf<String?>(null) }
+    val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
         if (cameraPermissionState.status is PermissionStatus.Denied) {
@@ -50,7 +48,6 @@ fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = 
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Back-knop linksboven
         if (navController != null) {
             IconButton(
                 onClick = { navController.popBackStack() },
@@ -62,6 +59,7 @@ fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = 
                 )
             }
         }
+
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (cameraPermissionState.status) {
                 is PermissionStatus.Granted -> {
@@ -82,7 +80,11 @@ fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = 
                                     processImageProxy(imageProxy) { result ->
                                         if (result != null && scannedCode == null) {
                                             scannedCode = result
-                                            onQrScanned(result)
+                                            // Split the QR code data to get user ID and name
+                                            val parts = result.split("|")
+                                            if (parts.size == 2) {
+                                                viewModel.handleScannedQrCode(parts[0], parts[1])
+                                            }
                                         }
                                     }
                                 }
@@ -98,13 +100,6 @@ fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = 
                         },
                         modifier = Modifier.fillMaxSize()
                     )
-                    if (scannedCode != null) {
-                        Text(
-                            text = "QR Code: $scannedCode",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
                 }
                 is PermissionStatus.Denied -> {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -114,6 +109,35 @@ fun CameraScreen(onQrScanned: (String) -> Unit, navController: NavController? = 
                         }
                     }
                 }
+            }
+        }
+
+        // Add Friend Dialog
+        if (state.showAddFriendDialog) {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissAddFriendDialog() },
+                title = { Text("Add Friend") },
+                text = { Text("Would you like to add ${state.scannedUserName} to your family?") },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel.sendFriendshipRequest() },
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                    ) {
+                        Text("Add")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissAddFriendDialog() }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        // Error Snackbar
+        state.error?.let { error ->
+            LaunchedEffect(error) {
+                // Show error snackbar
             }
         }
     }

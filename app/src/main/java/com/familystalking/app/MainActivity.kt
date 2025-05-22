@@ -30,11 +30,17 @@ import com.familystalking.app.presentation.family.FamilyScreen
 import com.familystalking.app.presentation.family.FamilyQrScreen
 import com.familystalking.app.presentation.family.CameraScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
+import com.familystalking.app.ui.theme.PrimaryGreen
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
+import com.familystalking.app.presentation.family.FamilyViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,6 +56,8 @@ class MainActivity : ComponentActivity() {
                     val viewModel: MainViewModel = hiltViewModel()
                     val sessionState by viewModel.sessionState.collectAsState()
                     val snackbarHostState = remember { SnackbarHostState() }
+                    val familyViewModel: FamilyViewModel = hiltViewModel()
+                    val state by familyViewModel.state.collectAsState()
 
                     LaunchedEffect(Unit) {
                         viewModel.checkSession()
@@ -105,23 +113,37 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Settings.route) {
                             settingsScreen(navController)
                         }
-                        composable("camera_placeholder") {
-                            val scannedCode = remember { mutableStateOf<String?>(null) }
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                CameraScreen(
-                                    onQrScanned = { scannedCode.value = it },
-                                    navController = navController
-                                )
-                                if (scannedCode.value != null) {
-                                    SnackbarHost(
-                                        hostState = snackbarHostState,
-                                        modifier = Modifier.align(Alignment.BottomCenter)
-                                    )
-                                    LaunchedEffect(scannedCode.value) {
-                                        snackbarHostState.showSnackbar("QR Code: ${scannedCode.value}")
-                                    }
+                        composable("camera") {
+                            CameraScreen(navController = navController)
+                        }
+                    }
+
+                    // Global friendship request dialog
+                    state.pendingRequests.forEach { request ->
+                        AlertDialog(
+                            onDismissRequest = { familyViewModel.dismissRequestDialog() },
+                            title = { Text("Friend Request") },
+                            text = { Text("${request.senderId} wants to add you to their family") },
+                            confirmButton = {
+                                Button(
+                                    onClick = { familyViewModel.acceptFriendshipRequest(request.id) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                                ) {
+                                    Text("Accept")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { familyViewModel.rejectFriendshipRequest(request.id) }) {
+                                    Text("Reject")
                                 }
                             }
+                        )
+                    }
+
+                    // Global error snackbar
+                    state.error?.let { error ->
+                        LaunchedEffect(error) {
+                            // Show error snackbar
                         }
                     }
                 }
