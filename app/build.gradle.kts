@@ -7,6 +7,8 @@ plugins {
     kotlin("plugin.serialization") version "1.9.22"
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
     id("com.google.dagger.hilt.android")
+    id("io.gitlab.arturbosch.detekt")
+    id("jacoco")
 }
 
 android {
@@ -78,6 +80,7 @@ dependencies {
     val supabaseVersion = "2.1.3"
     val lifecycleVersion = "2.7.0"
     val cameraxVersion = "1.3.1"
+    val detektVersion = "1.23.5"
 
     implementation(platform("androidx.compose:compose-bom:$composeBomVersion"))
     implementation("androidx.core:core-ktx:1.12.0")
