@@ -17,6 +17,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -207,10 +208,7 @@ private fun settingsCard(
                     modifier = Modifier.scale(SWITCH_SCALE)
                 )
             }
-            Divider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = DIVIDER_COLOR
-            )
+            HorizontalDivider()
             // Notifications section
             Text(
                 text = "Notifications",
@@ -243,10 +241,7 @@ private fun settingsCard(
                     modifier = Modifier.scale(SWITCH_SCALE)
                 )
             }
-            Divider(
-                modifier = Modifier.padding(vertical = 8.dp),
-                color = DIVIDER_COLOR
-            )
+            HorizontalDivider()
             // Map settings section
             Text(
                 text = "Map settings",
