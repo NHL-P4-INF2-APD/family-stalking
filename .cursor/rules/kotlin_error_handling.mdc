@@ -1,0 +1,10 @@
+---
+description: helpful for understanding project Kotlin Error Handling Standards
+globs: 
+alwaysApply: false
+---
+# Kotlin Error Handling Standards
+
+*   Exceptions are reserved for truly exceptional, unrecoverable conditions.
+*   For expected outcomes that may involve success or failure, a `Result` type or equivalent must be used.
+*   Error messages must be clear, concise, and provide sufficient context for immediate diagnosis.

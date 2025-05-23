@@ -1,5 +1,7 @@
 package com.familystalking.app.presentation.login
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.familystalking.app.domain.model.AuthError
@@ -7,9 +9,6 @@ import com.familystalking.app.domain.model.AuthResult
 import com.familystalking.app.domain.repository.AuthenticationRepository
 import com.familystalking.app.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -18,20 +17,20 @@ class LoginViewModel @Inject constructor(
     private val authenticationRepository: AuthenticationRepository
 ) : ViewModel() {
 
-    private val _email = MutableStateFlow("")
-    val email: StateFlow<String> = _email.asStateFlow()
+    private val _email = MutableLiveData("")
+    val email: LiveData<String> = _email
 
-    private val _password = MutableStateFlow("")
-    val password: StateFlow<String> = _password.asStateFlow()
+    private val _password = MutableLiveData("")
+    val password: LiveData<String> = _password
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    private val _isLoading = MutableLiveData(false)
+    val isLoading: LiveData<Boolean> = _isLoading
 
-    private val _error = MutableStateFlow<AuthError?>(null)
-    val error: StateFlow<AuthError?> = _error.asStateFlow()
+    private val _error = MutableLiveData<AuthError?>()
+    val error: LiveData<AuthError?> = _error
 
-    private val _navigateTo = MutableStateFlow<String?>(null)
-    val navigateTo: StateFlow<String?> = _navigateTo.asStateFlow()
+    private val _navigateTo = MutableLiveData<String?>()
+    val navigateTo: LiveData<String?> = _navigateTo
 
     fun onEmailChange(email: String) {
         _email.value = email
@@ -45,15 +44,15 @@ class LoginViewModel @Inject constructor(
 
     fun onSignIn() {
         if (!validateInput()) return
-        
+
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
-            
-            when (val result = authenticationRepository.signIn(_email.value, _password.value)) {
+
+            when (val result = authenticationRepository.signIn(_email.value ?: "", _password.value ?: "")) {
                 is AuthResult.Success -> {
                     _isLoading.value = false
-                    _navigateTo.value = Screen.Home.route
+                    _navigateTo.value = Screen.Map.route
                 }
                 is AuthResult.Error -> {
                     _error.value = result.error
@@ -64,7 +63,7 @@ class LoginViewModel @Inject constructor(
     }
 
     fun onForgotPassword() {
-        if (_email.value.isBlank()) {
+        if (_email.value.isNullOrBlank()) {
             _error.value = AuthError.InvalidEmail
             return
         }
@@ -73,7 +72,7 @@ class LoginViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            when (val result = authenticationRepository.resetPassword(_email.value)) {
+            when (val result = authenticationRepository.resetPassword(_email.value!!)) {
                 is AuthResult.Success -> {
                     _isLoading.value = false
                     // Show success message (handled by caller)
@@ -88,11 +87,11 @@ class LoginViewModel @Inject constructor(
 
     private fun validateInput(): Boolean {
         return when {
-            _email.value.isBlank() -> {
+            _email.value.isNullOrBlank() -> {
                 _error.value = AuthError.InvalidEmail
                 false
             }
-            _password.value.length < 6 -> {
+            (_password.value?.length ?: 0) < 6 -> {
                 _error.value = AuthError.WeakPassword
                 false
             }
@@ -107,4 +106,4 @@ class LoginViewModel @Inject constructor(
     fun onNavigated() {
         _navigateTo.value = null
     }
-} 
+}

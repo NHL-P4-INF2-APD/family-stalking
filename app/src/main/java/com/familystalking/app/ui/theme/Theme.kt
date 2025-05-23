@@ -3,10 +3,9 @@ package com.familystalking.app.ui.theme
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -14,10 +13,10 @@ import androidx.core.view.WindowCompat
 private val LightColorScheme = lightColorScheme(
     primary = PrimaryGreen,
     onPrimary = OnPrimaryGreen,
-    background = BackgroundColor,
+    background = Color.White,
     onBackground = OnBackgroundColor,
     error = ErrorColor,
-    surface = BackgroundColor,
+    surface = Color.White,
     onSurface = OnBackgroundColor,
     surfaceVariant = TextFieldBackgroundColor,
     onSurfaceVariant = OnBackgroundColor.copy(alpha = 0.6f)
@@ -31,7 +30,7 @@ fun FamilyStalkingTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = BackgroundColor.toArgb()
+            window.statusBarColor = Color.White.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
         }
     }
@@ -40,4 +39,4 @@ fun FamilyStalkingTheme(
         colorScheme = LightColorScheme,
         content = content
     )
-} 
+}

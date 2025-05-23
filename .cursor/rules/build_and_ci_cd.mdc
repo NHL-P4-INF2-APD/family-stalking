@@ -1,0 +1,23 @@
+---
+description: helpful for understanding build system and CI/CD pipeline in project
+globs: 
+alwaysApply: false
+---
+# Build System and CI/CD
+
+## Build System
+The project uses Gradle as its build system. 
+- Main build configuration: [build.gradle.kts](mdc:build.gradle.kts)
+- App-specific configuration: `app/build.gradle.kts` (typically)
+- Settings: [settings.gradle.kts](mdc:settings.gradle.kts)
+
+## CI/CD Pipeline
+The project utilizes GitHub Actions for its CI/CD pipeline, defined in `.github/workflows/`.
+The pipeline (as per [README.md](mdc:README.md)) automates:
+- Building the application with Gradle
+- Static code analysis with Detekt
+- Unit tests with JUnit 5
+- Code coverage reports with JaCoCo
+- Generation of release artifacts (APK)
+
+Refer to the [README.md](mdc:README.md) for more details.
