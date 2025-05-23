@@ -43,7 +43,7 @@ class AuthenticationRepositoryImpl @Inject constructor(
             }
             
             // Check if signup was successful and user is confirmed
-            if (response?.createdAt != null) {
+            if (response?.id != "") {
                 _sessionState.value = SessionState.Authenticated
                 AuthResult.Success
             } else {
