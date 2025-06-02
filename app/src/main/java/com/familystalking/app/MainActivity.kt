@@ -19,7 +19,7 @@ import com.familystalking.app.presentation.MainViewModel
 import com.familystalking.app.presentation.forgotpassword.ForgotPasswordScreen
 import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
-import com.familystalking.app.presentation.map.mapScreen
+import com.familystalking.app.presentation.map.MapScreen
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.settings.settingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController)
                         }
                         composable(Screen.Map.route) {
-                            mapScreen(navController)
+                            MapScreen(navController)
                         }
                         composable(Screen.Agenda.route) {
 

@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.familystalking.app.presentation.navigation.Screen
-import com.familystalking.app.presentation.navigation.bottomNavBar
+import com.familystalking.app.presentation.navigation.BottomNavBar
 
 private val BACKGROUND_COLOR = Color(0xFFF5F5F5)
 private val CARD_CORNER_RADIUS = 8.dp
@@ -94,7 +94,7 @@ fun settingsScreen(
             )
             signOutCard(isLoading = isLoading, onSignOut = viewModel::signOut)
         }
-        bottomNavBar(
+        BottomNavBar(
             currentRoute = Screen.Settings.route,
             navController = navController
         )

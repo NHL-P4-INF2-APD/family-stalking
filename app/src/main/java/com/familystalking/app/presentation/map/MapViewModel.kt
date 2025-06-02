@@ -8,16 +8,20 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 
+private const val MIN_BATTERY_PERCENTAGE = 0
+private const val MAX_BATTERY_PERCENTAGE = 100
+private const val INITIAL_BATTERY_PERCENTAGE = 100
+
 @HiltViewModel
 class MapViewModel @Inject constructor() : ViewModel() {
 
     private val _userLocation = MutableStateFlow<Location?>(null)
     val userLocation: StateFlow<Location?> = _userLocation.asStateFlow()
 
-    private val _batteryPercentage = MutableStateFlow(100)
+    private val _batteryPercentage = MutableStateFlow(INITIAL_BATTERY_PERCENTAGE)
     val batteryPercentage: StateFlow<Int> = _batteryPercentage.asStateFlow()
 
-    private val _userStatus = MutableStateFlow("Driving")
+    private val _userStatus = MutableStateFlow("Online") // Default status
     val userStatus: StateFlow<String> = _userStatus.asStateFlow()
 
     fun updateLocation(location: Location?) {
@@ -25,7 +29,7 @@ class MapViewModel @Inject constructor() : ViewModel() {
     }
 
     fun updateBatteryPercentage(percentage: Int) {
-        _batteryPercentage.value = percentage
+        _batteryPercentage.value = percentage.coerceIn(MIN_BATTERY_PERCENTAGE, MAX_BATTERY_PERCENTAGE)
     }
 
     fun updateUserStatus(status: String) {
