@@ -7,7 +7,6 @@ import com.familystalking.app.domain.repository.AuthenticationRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
-import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,7 +42,7 @@ class AuthenticationRepositoryImpl @Inject constructor(
             }
             
             // Check if signup was successful and user is confirmed
-            if (response?.createdAt != null) {
+            if (response?.id != "") {
                 _sessionState.value = SessionState.Authenticated
                 AuthResult.Success
             } else {

@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -23,8 +24,19 @@ import com.familystalking.app.presentation.map.MapScreen
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.settings.settingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
+import com.familystalking.app.presentation.family.FamilyScreen
+import com.familystalking.app.presentation.family.FamilyQrScreen
+import com.familystalking.app.presentation.family.CameraScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
+import com.familystalking.app.ui.theme.PrimaryGreen
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.remember
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
+import com.familystalking.app.presentation.family.FamilyViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -39,6 +51,9 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val viewModel: MainViewModel = hiltViewModel()
                     val sessionState by viewModel.sessionState.collectAsState()
+                    val snackbarHostState = remember { SnackbarHostState() }
+                    val familyViewModel: FamilyViewModel = hiltViewModel()
+                    val state by familyViewModel.state.collectAsState()
 
                     LaunchedEffect(Unit) {
                         viewModel.checkSession()
@@ -86,11 +101,45 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController)
                         }
                         composable(Screen.Family.route) {
-
-                            HomeScreen(navController)
+                            FamilyScreen(navController)
+                        }
+                        composable(Screen.FamilyQr.route) {
+                            FamilyQrScreen(navController)
                         }
                         composable(Screen.Settings.route) {
                             settingsScreen(navController)
+                        }
+                        composable("camera") {
+                            CameraScreen(navController = navController)
+                        }
+                    }
+
+                    // Global friendship request dialog
+                    state.pendingRequests.forEach { request ->
+                        AlertDialog(
+                            onDismissRequest = { familyViewModel.dismissRequestDialog() },
+                            title = { Text("Friend Request") },
+                            text = { Text("${request.senderId} wants to add you to their family") },
+                            confirmButton = {
+                                Button(
+                                    onClick = { familyViewModel.acceptFriendshipRequest(request.id) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                                ) {
+                                    Text("Accept")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { familyViewModel.rejectFriendshipRequest(request.id) }) {
+                                    Text("Reject")
+                                }
+                            }
+                        )
+                    }
+
+                    // Global error snackbar
+                    state.error?.let { error ->
+                        LaunchedEffect(error) {
+                            // Show error snackbar
                         }
                     }
                 }

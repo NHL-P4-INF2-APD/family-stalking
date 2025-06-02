@@ -149,7 +149,7 @@ private val LOCATION_PERMISSIONS = arrayOf(
 private const val LOCATION_TRACKING_ACTIVE_MESSAGE = "Location tracking active"
 
 @Composable
-fun MapScreen( // Public Composable: PascalCase
+fun MapScreen(
     navController: NavController,
     viewModel: MapViewModel = hiltViewModel()
 ) {
@@ -183,7 +183,7 @@ fun MapScreen( // Public Composable: PascalCase
     }
 
     LaunchedEffect(Unit) {
-        checkAndRequestLocationPermissions( // Private non-composable helper: camelCase
+        checkAndRequestLocationPermissions(
             context = context,
             onPermissionsGranted = {
                 locationPermissionGrantedState = true
@@ -198,7 +198,7 @@ fun MapScreen( // Public Composable: PascalCase
         )
     }
 
-    ManageLocationUpdatesEffect( // Private Composable: PascalCase
+    ManageLocationUpdatesEffect(
         locationPermissionGranted = locationPermissionGrantedState,
         onLocationUpdate = { viewModel.updateLocation(it) },
         onUiMessage = { uiMessage = it },
@@ -216,8 +216,8 @@ fun MapScreen( // Public Composable: PascalCase
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        UiMessageBar(uiMessage) // Private Composable: PascalCase
-        MapArea( // Private Composable: PascalCase
+        UiMessageBar(uiMessage)
+        MapArea(
             modifier = Modifier.weight(1f),
             currentMapLatLng = currentMapLatLng,
             defaultLocation = defaultLocation,
@@ -228,7 +228,7 @@ fun MapScreen( // Public Composable: PascalCase
     }
 
     if (showPermissionRationaleDialog) {
-        LocationPermissionRationaleDialog( // Public Composable: PascalCase
+        LocationPermissionRationaleDialog(
             onConfirm = {
                 showPermissionRationaleDialog = false
                 locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
@@ -242,14 +242,13 @@ fun MapScreen( // Public Composable: PascalCase
     }
 
     if (showLocationDisabledAlert) {
-        LocationServicesDisabledDialog( // Public Composable: PascalCase
+        LocationServicesDisabledDialog(
             context = context,
             onDismiss = { showLocationDisabledAlert = false }
         )
     }
 }
 
-// Private non-composable helper function: camelCase
 private fun checkAndRequestLocationPermissions(
     context: Context,
     onPermissionsGranted: () -> Unit,
@@ -284,7 +283,7 @@ private fun checkAndRequestLocationPermissions(
 }
 
 @Composable
-private fun UiMessageBar(message: String) { // Private Composable: PascalCase
+private fun UiMessageBar(message: String) {
     Text(
         text = message,
         modifier = Modifier
@@ -302,7 +301,7 @@ private fun UiMessageBar(message: String) { // Private Composable: PascalCase
 }
 
 @Composable
-private fun MapArea( // Private Composable: PascalCase
+private fun MapArea(
     modifier: Modifier = Modifier,
     currentMapLatLng: LatLng?,
     defaultLocation: LatLng,
@@ -321,7 +320,7 @@ private fun MapArea( // Private Composable: PascalCase
             cameraPositionState,
             currentMapLatLng,
             defaultLocation
-        ) // Private Composable: PascalCase
+        )
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
@@ -332,7 +331,7 @@ private fun MapArea( // Private Composable: PascalCase
             )
         ) {
             currentMapLatLng?.let { validLatLng ->
-                UserMarker( // Private Composable: PascalCase
+                UserMarker(
                     position = validLatLng,
                     batteryPercentage = batteryPercentage,
                     userStatus = userStatus,
@@ -344,7 +343,7 @@ private fun MapArea( // Private Composable: PascalCase
 }
 
 @Composable
-private fun MapCameraAnimator( // Private Composable: PascalCase
+private fun MapCameraAnimator(
     cameraPositionState: CameraPositionState,
     currentMapLatLng: LatLng?,
     defaultLocation: LatLng
@@ -374,7 +373,7 @@ private fun MapCameraAnimator( // Private Composable: PascalCase
 }
 
 @Composable
-private fun UserMarker( // Private Composable: PascalCase
+private fun UserMarker(
     position: LatLng,
     batteryPercentage: Int,
     userStatus: String,
@@ -391,15 +390,15 @@ private fun UserMarker( // Private Composable: PascalCase
                 verticalArrangement = Arrangement.Center
             ) {
                 Spacer(modifier = Modifier.height(MARKER_BATTERY_SPACER_HEIGHT_DP))
-                ProfileMarker(initials = initials) // Public Composable: PascalCase
-                StatusIndicator(status = userStatus) // Public Composable: PascalCase
+                ProfileMarker(initials = initials)
+                StatusIndicator(status = userStatus)
             }
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .offset(x = BATTERY_INDICATOR_OFFSET_X_DP.dp)
             ) {
-                BatteryIndicator(batteryPercentage = batteryPercentage) // Public Composable: PascalCase
+                BatteryIndicator(batteryPercentage = batteryPercentage)
             }
         }
     }
@@ -417,7 +416,7 @@ private data class LocationUpdateParams(
 
 @SuppressLint("MissingPermission")
 @Composable
-private fun ManageLocationUpdatesEffect( // Private Composable: PascalCase
+private fun ManageLocationUpdatesEffect(
     locationPermissionGranted: Boolean,
     onLocationUpdate: (Location?) -> Unit,
     onUiMessage: (String) -> Unit,
@@ -455,16 +454,15 @@ private fun ManageLocationUpdatesEffect( // Private Composable: PascalCase
             } else {
                 onShowLocationDisabledAlert(false)
 
-                val locationListener =
-                    createLocationListener( // Private non-composable helper: camelCase
-                        context = context,
-                        onLocationUpdate = onLocationUpdate,
-                        onUiMessage = onUiMessage,
-                        onShowLocationDisabledAlert = onShowLocationDisabledAlert,
-                        onReCheckAfterProviderEnabled = {
-                            Log.d(TAG, "A provider was re-enabled.")
-                        }
-                    )
+                val locationListener = createLocationListener(
+                    context = context,
+                    onLocationUpdate = onLocationUpdate,
+                    onUiMessage = onUiMessage,
+                    onShowLocationDisabledAlert = onShowLocationDisabledAlert,
+                    onReCheckAfterProviderEnabled = {
+                        Log.d(TAG, "A provider was re-enabled.")
+                    }
+                )
                 val params = LocationUpdateParams(
                     context = context,
                     locationManager = locationManager,
@@ -475,7 +473,7 @@ private fun ManageLocationUpdatesEffect( // Private Composable: PascalCase
                     onUiMessage = onUiMessage
                 )
                 try {
-                    requestLastKnownAndUpdates(params) // Private non-composable helper: camelCase
+                    requestLastKnownAndUpdates(params)
                 } catch (e: SecurityException) {
                     Log.e(TAG, "SecurityException during location setup: ${e.message}", e)
                     onLocationUpdate(null)
@@ -508,7 +506,6 @@ private fun ManageLocationUpdatesEffect( // Private Composable: PascalCase
     }
 }
 
-// Private non-composable helper function: camelCase
 private fun createLocationListener(
     context: Context,
     onLocationUpdate: (Location?) -> Unit,
@@ -549,7 +546,6 @@ private fun createLocationListener(
 }
 
 @SuppressLint("MissingPermission")
-// Private non-composable helper function: camelCase
 private fun requestLastKnownAndUpdates(params: LocationUpdateParams) {
     var lastKnownLoc: Location? = null
     if (params.isGpsEnabled) {
@@ -563,7 +559,6 @@ private fun requestLastKnownAndUpdates(params: LocationUpdateParams) {
         params.onLocationUpdate(it)
         params.onUiMessage(LOCATION_TRACKING_ACTIVE_MESSAGE)
     } ?: params.onUiMessage("No last known location. Waiting for new updates...")
-
 
     if (params.isGpsEnabled) {
         params.locationManager.requestLocationUpdates(
@@ -589,7 +584,7 @@ private fun requestLastKnownAndUpdates(params: LocationUpdateParams) {
 fun LocationPermissionRationaleDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
-) { // Public Composable: PascalCase
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Location Permission Needed") },
@@ -603,7 +598,7 @@ fun LocationPermissionRationaleDialog(
 fun LocationServicesDisabledDialog(
     context: Context,
     onDismiss: () -> Unit
-) { // Public Composable: PascalCase
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Location Services Disabled") },
@@ -619,7 +614,7 @@ fun LocationServicesDisabledDialog(
 }
 
 @Composable
-fun BatteryIndicator(batteryPercentage: Int) { // Public Composable: PascalCase
+fun BatteryIndicator(batteryPercentage: Int) {
     val batteryColor = when {
         batteryPercentage > BATTERY_LEVEL_GOOD -> Color(0xFF4CAF50)
         batteryPercentage > BATTERY_LEVEL_OKAY -> Color(0xFFFFA000)
@@ -667,7 +662,7 @@ fun BatteryIndicator(batteryPercentage: Int) { // Public Composable: PascalCase
 }
 
 @Composable
-fun StatusIndicator(status: String) { // Public Composable: PascalCase
+fun StatusIndicator(status: String) {
     Card(
         modifier = Modifier.padding(top = MARKER_STATUS_PADDING_TOP_DP),
         shape = STATUS_INDICATOR_SHAPE,
@@ -700,7 +695,7 @@ fun StatusIndicator(status: String) { // Public Composable: PascalCase
 }
 
 @Composable
-fun ProfileMarker(initials: String) { // Public Composable: PascalCase
+fun ProfileMarker(initials: String) {
     Box(
         modifier = Modifier
             .size(MARKER_PROFILE_SIZE_DP)
