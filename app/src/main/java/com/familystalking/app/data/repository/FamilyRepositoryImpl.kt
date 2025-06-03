@@ -7,7 +7,10 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.gotrue.auth
 import javax.inject.Inject
 import java.util.UUID
-import java.time.Instant
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 data class FamilyMemberSupabase(
     val name: String,
@@ -65,7 +68,7 @@ class FamilyRepositoryImpl @Inject constructor(
                     senderId = currentUserId,
                     receiverId = receiverId,
                     status = "pending",
-                    timestamp = Instant.now().toString()
+                    timestamp = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(System.currentTimeMillis()))
                 )
             )
             Result.success(Unit)
