@@ -61,9 +61,9 @@ fun FamilyScreen(
                 ) {
                     Text(
                         text = if (searchQuery.isNotEmpty()) {
-                            "No family members found matching '$searchQuery'"
+                            "No friends found matching '$searchQuery'"
                         } else {
-                            "You haven't added any family members yet."
+                            "You haven't added any friends yet."
                         },
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.Gray

@@ -129,7 +129,7 @@ fun CameraScreen(
             AlertDialog(
                 onDismissRequest = { viewModel.dismissAddFriendDialog() },
                 title = { Text("Add Friend") },
-                text = { Text("Would you like to add ${state.scannedUserName} to your family?") },
+                text = { Text("Would you like to add ${state.scannedUserName} as friend?") },
                 confirmButton = {
                     Button(
                         onClick = { viewModel.sendFriendshipRequest() },
