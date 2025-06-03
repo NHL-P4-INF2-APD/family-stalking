@@ -1,4 +1,10 @@
 import java.util.Properties
+import org.gradle.api.tasks.testing.Test
+import org.gradle.testing.jacoco.plugins.JacocoTaskExtension
+import org.gradle.testing.jacoco.tasks.JacocoReport
+// For more robust path matching if needed, though not strictly required by the fix below
+// import org.gradle.api.internal.file.pattern.PathMatcher
+// import org.gradle.api.internal.file.pattern.PatternMatcherFactory
 
 plugins {
     id("com.android.application")
@@ -26,13 +32,13 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        
+
         val properties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
         if (localPropertiesFile.exists()) {
             properties.load(localPropertiesFile.inputStream())
         }
-        
+
         buildConfigField("String", "SUPABASE_URL", "\"${properties.getProperty("SUPABASE_URL", "")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${properties.getProperty("SUPABASE_ANON_KEY", "")}\"")
         manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = properties.getProperty("GOOGLE_MAPS_API_KEY", "")
@@ -75,6 +81,9 @@ android {
 }
 
 dependencies {
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+
     val composeBomVersion = "2024.02.00"
     val hiltVersion = "2.50"
     val supabaseVersion = "2.1.3"
@@ -97,7 +106,6 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.runtime:runtime-livedata:1.6.6")
 
-    // Supabase
     implementation(platform("io.github.jan-tennert.supabase:bom:$supabaseVersion"))
     implementation("io.github.jan-tennert.supabase:gotrue-kt")
     implementation("io.github.jan-tennert.supabase:compose-auth-ui")
@@ -110,38 +118,14 @@ dependencies {
     implementation("io.ktor:ktor-client-core:2.3.8")
     implementation("io.ktor:ktor-client-cio:2.3.8")
 
-    // Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
 
-    // Hilt
     implementation("com.google.dagger:hilt-android:$hiltVersion")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
     kapt("com.google.dagger:hilt-android-compiler:$hiltVersion")
 
-    // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-
-    // Google Maps and Location
-    implementation("com.google.android.gms:play-services-maps:18.2.0")
-    implementation("com.google.android.gms:play-services-location:21.1.0")
-    implementation("com.google.maps.android:maps-compose:4.3.0")
-
-    // CameraX
-    implementation("androidx.camera:camera-camera2:$cameraxVersion")
-    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
-    implementation("androidx.camera:camera-view:$cameraxVersion")
-
-    // ZXing (Barcode/QR scanning)
-    implementation("com.google.zxing:core:3.5.3")
-
-    // Accompanist
-    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
-
-    // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
@@ -150,18 +134,11 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-    // Detekt
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:$detektVersion")
 
-    // Google Maps SDK and Compose integration
     implementation("com.google.android.gms:play-services-maps:18.2.0")
-    implementation("com.google.maps.android:maps-compose:2.11.4")
-
-    // ZXing dependency for QR-code generation
-    implementation("com.google.zxing:core:3.5.3")
-
-    // Accompanist Permissions
-    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
+    implementation("com.google.maps.android:maps-compose:4.3.3")
+    implementation("com.google.maps.android:maps-compose-utils:4.3.3")
 }
 
 detekt {
@@ -196,26 +173,43 @@ tasks.register<JacocoReport>("coverage") {
         csv.required.set(false)
     }
 
-    val fileFilter = listOf(
+    val fileFilterPatterns = listOf( // Renamed for clarity
         "**/R.class",
-        "**/R$*.class",
+        "**/R\$*.class",
         "**/BuildConfig.*",
         "**/Manifest*.*",
         "**/*Test*.*",
         "android/**/*.*",
-        "**/*\$Lambda$*.*", // Jacoco can not handle several "$" in class names
-        "**/*\$inlined$*.*" // Kotlin specific, Jacoco can not handle several "$" in class names
+        "**/*\$Lambda\$*.*",
+        "**/*\$inlined$*.*",
+        "**/*\$default$*.*",
+        "**/*\$Companion$*.*",
+        "**/*Kt.class",
+        "**/models/**",
+        "**/di/**"
     )
 
-    val debugTree = fileTree("${project.buildDir}/tmp/kotlin-classes/debug") {
-        exclude(fileFilter)
+    // Combine class directories from different locations
+    val classDirs = files(
+        "${project.layout.buildDirectory.asFile.get()}/intermediates/javac/debug/classes",
+        "${project.layout.buildDirectory.asFile.get()}/tmp/kotlin-classes/debug"
+    ).asFileTree.matching {
+        exclude(fileFilterPatterns) // Apply exclusions here
     }
 
-    val mainSrc = "${project.projectDir}/src/main/kotlin"
+    val mainSrc = "${project.projectDir}/src/main/java"
+    val kotlinSrc = "${project.projectDir}/src/main/kotlin"
 
-    sourceDirectories.setFrom(files(mainSrc))
-    classDirectories.setFrom(files(debugTree))
-    executionData.setFrom(fileTree(project.buildDir) {
-        include("jacoco/testDebugUnitTest.exec")
-    })
+    sourceDirectories.setFrom(files(mainSrc, kotlinSrc))
+    classDirectories.setFrom(classDirs) // Use the filtered file tree
+
+    executionData.setFrom(
+        fileTree(project.layout.buildDirectory.asFile.get()) { // Use modern way to get buildDir
+            include(
+                "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec",
+                "jacoco/testDebugUnitTest.exec", // Legacy path
+                "**/testDebugUnitTest.exec"     // More generic search
+            )
+        }
+    )
 }

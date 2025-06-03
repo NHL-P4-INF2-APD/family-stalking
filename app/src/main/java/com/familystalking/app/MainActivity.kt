@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(navController)
                         }
                         composable(Screen.Map.route) {
-                            MapScreen(navController = navController)
+                            MapScreen(navController)
                         }
                         composable(Screen.Agenda.route) {
 
