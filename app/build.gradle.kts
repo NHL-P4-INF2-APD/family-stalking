@@ -90,6 +90,9 @@ dependencies {
     val lifecycleVersion = "2.7.0"
     val cameraxVersion = "1.3.1"
     val detektVersion = "1.23.5"
+    val accompanistVersion = "0.34.0"
+    val zxingVersion = "3.5.3"
+    val playServicesLocationVersion = "21.2.0"
 
     implementation(platform("androidx.compose:compose-bom:$composeBomVersion"))
     implementation("androidx.core:core-ktx:1.12.0")
@@ -105,6 +108,16 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.runtime:runtime-livedata:1.6.6")
+
+    implementation("androidx.camera:camera-core:${cameraxVersion}")
+    implementation("androidx.camera:camera-camera2:${cameraxVersion}")
+    implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")
+    implementation("androidx.camera:camera-view:${cameraxVersion}")
+    implementation("androidx.camera:camera-extensions:${cameraxVersion}")
+
+    implementation("com.google.accompanist:accompanist-permissions:${accompanistVersion}")
+
+    implementation("com.google.zxing:core:${zxingVersion}")
 
     implementation(platform("io.github.jan-tennert.supabase:bom:$supabaseVersion"))
     implementation("io.github.jan-tennert.supabase:gotrue-kt")
@@ -137,6 +150,7 @@ dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:$detektVersion")
 
     implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:${playServicesLocationVersion}")
     implementation("com.google.maps.android:maps-compose:4.3.3")
     implementation("com.google.maps.android:maps-compose-utils:4.3.3")
 }
