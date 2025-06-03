@@ -81,10 +81,12 @@ dependencies {
     val hiltVersion = "2.50"
     val supabaseVersion = "2.1.3"
     val lifecycleVersion = "2.7.0"
-    val cameraxVersion = "1.4.2" // Using 1.4.2 as you had it, instead of the unused 1.3.1 variable
-    val detektPluginVersion = "1.23.5" // Matches plugin version for detektPlugins
-    val accompanistVersion = "0.31.5-beta" // Example version, adjust if needed for compatibility
-    val zxingVersion = "3.5.2" // For QR Code scanning
+
+    val cameraxVersion = "1.4.2" 
+    val detektPluginVersion = "1.23.5" 
+    val accompanistVersion = "0.31.5-beta" 
+    val zxingVersion = "3.5.2" 
+
 
     // Core & Lifecycle
     implementation("androidx.core:core-ktx:1.12.0")
@@ -114,6 +116,7 @@ dependencies {
     implementation("com.google.zxing:core:$zxingVersion")
 
     // Supabase
+
     implementation(platform("io.github.jan-tennert.supabase:bom:$supabaseVersion"))
     implementation("io.github.jan-tennert.supabase:gotrue-kt")
     implementation("io.github.jan-tennert.supabase:compose-auth-ui")
