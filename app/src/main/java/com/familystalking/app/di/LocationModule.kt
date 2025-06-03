@@ -1,8 +1,7 @@
 package com.familystalking.app.di
 
 import android.content.Context
-import com.familystalking.app.data.repository.SupabaseLocationRepository
-import com.familystalking.app.domain.repository.LocationRepository
+import com.google.android.gms.location.FusedLocationProviderClient // Ensure this import is present
 import com.google.android.gms.location.LocationServices
 import dagger.Module
 import dagger.Provides
@@ -13,17 +12,13 @@ import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
-object LocationModule {
+object LocationModule { // Or 'class LocationModule'
 
     @Provides
     @Singleton
     fun provideFusedLocationProviderClient(
         @ApplicationContext context: Context
-    ) = LocationServices.getFusedLocationProviderClient(context)
-
-    @Provides
-    @Singleton
-    fun provideLocationRepository(
-        supabaseLocationRepository: SupabaseLocationRepository
-    ): LocationRepository = supabaseLocationRepository
-} 
+    ): FusedLocationProviderClient { // <<< CORRECT RETURN TYPE
+        return LocationServices.getFusedLocationProviderClient(context)
+    }
+}

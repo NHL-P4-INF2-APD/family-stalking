@@ -25,7 +25,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.ui.theme.PrimaryGreen
-import com.familystalking.app.presentation.navigation.bottomNavBar
+import com.familystalking.app.presentation.navigation.BottomNavBar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +141,7 @@ fun FamilyScreen(
         Box(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            bottomNavBar(
+            BottomNavBar(
                 currentRoute = Screen.Family.route,
                 navController = navController
             )
