@@ -22,7 +22,7 @@ import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
 import com.familystalking.app.presentation.map.MapScreen
 import com.familystalking.app.presentation.navigation.Screen
-import com.familystalking.app.presentation.settings.settingsScreen
+import com.familystalking.app.presentation.settings.SettingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
 import com.familystalking.app.presentation.family.FamilyScreen
 import com.familystalking.app.presentation.family.FamilyQrScreen
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
                             FamilyQrScreen(navController)
                         }
                         composable(Screen.Settings.route) {
-                            settingsScreen(navController)
+                            SettingsScreen(navController)
                         }
                         composable("camera") {
                             CameraScreen(navController = navController)

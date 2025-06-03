@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.Battery3Bar
 import androidx.compose.material.icons.filled.Battery5Bar
 import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -82,7 +84,6 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.delay
 
-// Constants
 private const val TAG = "MapScreen"
 private const val DEFAULT_LATITUDE = 52.3676
 private const val DEFAULT_LONGITUDE = 4.9041
@@ -96,7 +97,6 @@ private const val CAMERA_ANIMATION_DURATION_MS = 1000
 
 private const val MARKER_ANCHOR_X = 0.5f
 private const val MARKER_ANCHOR_Y = 0.8f
-private const val BATTERY_INDICATOR_OFFSET_X_DP = -8
 
 private const val BATTERY_LEVEL_FULL = 90
 private const val BATTERY_LEVEL_VERY_GOOD = 75
@@ -112,8 +112,6 @@ private const val MARKER_PROFILE_SIZE_DP_VALUE = 56
 private val MARKER_PROFILE_SIZE_DP: Dp = MARKER_PROFILE_SIZE_DP_VALUE.dp
 private const val MARKER_BORDER_WIDTH_DP_VALUE = 2
 private val MARKER_BORDER_WIDTH_DP: Dp = MARKER_BORDER_WIDTH_DP_VALUE.dp
-private const val MARKER_BATTERY_SPACER_HEIGHT_DP_VALUE = 28
-private val MARKER_BATTERY_SPACER_HEIGHT_DP: Dp = MARKER_BATTERY_SPACER_HEIGHT_DP_VALUE.dp
 private const val MARKER_STATUS_PADDING_TOP_DP_VALUE = 4
 private val MARKER_STATUS_PADDING_TOP_DP: Dp = MARKER_STATUS_PADDING_TOP_DP_VALUE.dp
 private const val MARKER_STATUS_PADDING_HORIZONTAL_DP_VALUE = 12
@@ -138,15 +136,28 @@ private val BATTERY_INDICATOR_PADDING_VERTICAL_DP: Dp =
     BATTERY_INDICATOR_PADDING_VERTICAL_DP_VALUE.dp
 private const val BATTERY_ICON_SIZE_DP_VALUE = 18
 private val BATTERY_ICON_SIZE_DP: Dp = BATTERY_ICON_SIZE_DP_VALUE.dp
-private const val BATTERY_INDICATOR_SPACING_DP_VALUE = 5
-private val BATTERY_INDICATOR_SPACING_DP: Dp = BATTERY_INDICATOR_SPACING_DP_VALUE.dp
+private const val BATTERY_INDICATOR_INTERNAL_SPACING_DP_VALUE = 4
+private val BATTERY_INDICATOR_INTERNAL_SPACING_DP: Dp = BATTERY_INDICATOR_INTERNAL_SPACING_DP_VALUE.dp
+
+private val SHARING_ICON_SIZE_DP: Dp = 18.dp
+private val MARKER_ELEMENT_SPACING_DP: Dp = 4.dp
 
 private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,
     Manifest.permission.ACCESS_COARSE_LOCATION
 )
 
-private const val LOCATION_TRACKING_ACTIVE_MESSAGE = "Location tracking active"
+private const val MSG_PERM_DENIED = "Location permission denied."
+private const val MSG_PERM_RATIONALE_DISMISSED = "Permission rationale dismissed."
+private const val MSG_REQUESTING_PERM = "Requesting location permission..."
+private const val MSG_DEVICE_LOCATION_OFF = "Enable Device Location Services for map features."
+private const val MSG_LOCATION_ERROR = "Location error."
+private const val MSG_LOCATION_CONFIG_ERROR = "Location configuration error."
+// private const val MSG_SHARING_OFF_SETTINGS = "Location sharing is off in settings." // No longer shown in UiMessageBar
+private const val MSG_PROVIDER_RE_ENABLED = "Location provider re-enabled."
+private const val MSG_PROVIDER_DISABLED_ALL_OFF = "All device location services disabled."
+private const val MSG_PROVIDER_DISABLED_SOME_OFF = "A location provider was disabled."
+
 
 @Composable
 fun MapScreen(
@@ -157,51 +168,55 @@ fun MapScreen(
     val userLocationFromVm by viewModel.userLocation.collectAsStateWithLifecycle()
     val batteryPercentage by viewModel.batteryPercentage.collectAsStateWithLifecycle()
     val userStatus by viewModel.userStatus.collectAsStateWithLifecycle()
+    val shouldShowBatteryOnMap by viewModel.shouldShowBatteryOnMap.collectAsStateWithLifecycle()
+    val isLocationSharingPreferred by viewModel.isLocationSharingPreferred.collectAsStateWithLifecycle()
 
     var locationPermissionGrantedState by remember { mutableStateOf(false) }
     var showPermissionRationaleDialog by remember { mutableStateOf(false) }
     var showLocationDisabledAlert by remember { mutableStateOf(false) }
-    var uiMessage by remember { mutableStateOf("Initializing Map...") }
+    var uiMessage by remember { mutableStateOf("") }
 
     val defaultLocation = remember { LatLng(DEFAULT_LATITUDE, DEFAULT_LONGITUDE) }
+    // currentMapLatLng is always based on userLocationFromVm for the user's own map display
     val currentMapLatLng: LatLng? = userLocationFromVm?.let { LatLng(it.latitude, it.longitude) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
+        ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val isGranted = permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+        locationPermissionGrantedState = permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
                 permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false)
-        locationPermissionGrantedState = isGranted
-        if (isGranted) {
-            uiMessage = "Permission granted. Fetching location..."
-            Log.d(TAG, "Permission granted by user.")
+        if (!locationPermissionGrantedState) {
+            uiMessage = MSG_PERM_DENIED
+            viewModel.updateLocation(null) // Clear location in VM if permission denied
         } else {
-            uiMessage = "Location permission denied. Showing default location."
-            Log.d(TAG, "Permission denied by user.")
-            viewModel.updateLocation(null)
+            uiMessage = "" // Clear message if granted
         }
     }
 
     LaunchedEffect(Unit) {
-        checkAndRequestLocationPermissions(
-            context = context,
-            onPermissionsGranted = {
-                locationPermissionGrantedState = true
-                Log.d(TAG, "Permissions already granted.")
-                uiMessage = "Permission OK. Checking location services..."
-            },
-            onShowRationale = { showPermissionRationaleDialog = true },
-            onRequestPermissions = {
-                uiMessage = "Requesting location permission..."
-                locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
-            }
-        )
+        if (!locationPermissionGrantedState) {
+            checkAndRequestLocationPermissions(
+                context = context,
+                onPermissionsGranted = {
+                    locationPermissionGrantedState = true
+                    uiMessage = ""
+                },
+                onShowRationale = { showPermissionRationaleDialog = true },
+                onRequestPermissions = {
+                    uiMessage = MSG_REQUESTING_PERM
+                    locationPermissionLauncher.launch(LOCATION_PERMISSIONS)
+                }
+            )
+        }
     }
 
     ManageLocationUpdatesEffect(
         locationPermissionGranted = locationPermissionGrantedState,
-        onLocationUpdate = { viewModel.updateLocation(it) },
-        onUiMessage = { uiMessage = it },
+        // isLocationSharingPreferredSetting is NO LONGER passed here.
+        // The effect's job is to get location if permissions are met for local display.
+        // ViewModel handles backend sharing based on the preference.
+        onLocationUpdate = { newLocation -> viewModel.updateLocation(newLocation) },
+        onUiMessage = { message -> uiMessage = message },
         onShowLocationDisabledAlert = { showLocationDisabledAlert = it }
     )
 
@@ -216,13 +231,17 @@ fun MapScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        UiMessageBar(uiMessage)
+        if (uiMessage.isNotBlank()) {
+            UiMessageBar(uiMessage = uiMessage)
+        }
         MapArea(
             modifier = Modifier.weight(1f),
             currentMapLatLng = currentMapLatLng,
             defaultLocation = defaultLocation,
             batteryPercentage = batteryPercentage,
-            userStatus = userStatus
+            userStatus = userStatus,
+            shouldShowBattery = shouldShowBatteryOnMap,
+            isLocationSharingPreferred = isLocationSharingPreferred // For marker icon
         )
         BottomNavBar(navController = navController, currentRoute = "map")
     }
@@ -235,7 +254,7 @@ fun MapScreen(
             },
             onDismiss = {
                 showPermissionRationaleDialog = false
-                uiMessage = "Permission rationale dismissed. Default location shown."
+                uiMessage = MSG_PERM_RATIONALE_DISMISSED
                 viewModel.updateLocation(null)
             }
         )
@@ -265,16 +284,9 @@ private fun checkAndRequestLocationPermissions(
     if (fineLocationGranted || coarseLocationGranted) {
         onPermissionsGranted()
     } else {
-        Log.d(TAG, "Permissions not granted.")
         val activity = context as? Activity
-        val shouldShowFineRationale = activity?.shouldShowRequestPermissionRationale(
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) ?: false
-        val shouldShowCoarseRationale = activity?.shouldShowRequestPermissionRationale(
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) ?: false
-
-        if (shouldShowFineRationale || shouldShowCoarseRationale) {
+        if (activity?.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) == true ||
+            activity?.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION) == true) {
             onShowRationale()
         } else {
             onRequestPermissions()
@@ -283,20 +295,30 @@ private fun checkAndRequestLocationPermissions(
 }
 
 @Composable
-private fun UiMessageBar(message: String) {
+private fun UiMessageBar(uiMessage: String) {
+    val isErrorOrImportant = uiMessage == MSG_PERM_DENIED ||
+            uiMessage == MSG_DEVICE_LOCATION_OFF ||
+            uiMessage.contains("error", ignoreCase = true)
+    // Removed MSG_SHARING_OFF_SETTINGS from error-like styling
+
+    val backgroundColor = if (isErrorOrImportant) {
+        MaterialTheme.colorScheme.errorContainer
+    } else {
+        MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = UI_MESSAGE_BACKGROUND_ALPHA)
+    }
+    val textColor = if (isErrorOrImportant) {
+        MaterialTheme.colorScheme.onErrorContainer
+    } else {
+        MaterialTheme.colorScheme.onTertiaryContainer
+    }
+
     Text(
-        text = message,
+        text = uiMessage,
         modifier = Modifier
             .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.tertiaryContainer.copy(
-                    alpha = UI_MESSAGE_BACKGROUND_ALPHA
-                )
-            )
+            .background(backgroundColor)
             .padding(8.dp),
-        textAlign = TextAlign.Center,
-        fontSize = 12.sp,
-        color = MaterialTheme.colorScheme.onTertiaryContainer
+        textAlign = TextAlign.Center, fontSize = 12.sp, color = textColor
     )
 }
 
@@ -306,36 +328,32 @@ private fun MapArea(
     currentMapLatLng: LatLng?,
     defaultLocation: LatLng,
     batteryPercentage: Int,
-    userStatus: String
+    userStatus: String,
+    shouldShowBattery: Boolean,
+    isLocationSharingPreferred: Boolean
 ) {
-    Box(
-        modifier = modifier.fillMaxWidth()
-    ) {
+    Box(modifier = modifier.fillMaxWidth()) {
         val cameraPositionState = rememberCameraPositionState {
             position = CameraPosition.fromLatLngZoom(
-                currentMapLatLng ?: defaultLocation, INITIAL_MAP_ZOOM
+                currentMapLatLng ?: defaultLocation,
+                if (currentMapLatLng != null) INITIAL_MAP_ZOOM else DEFAULT_MAP_NO_LOCATION_ZOOM
             )
         }
-        MapCameraAnimator(
-            cameraPositionState,
-            currentMapLatLng,
-            defaultLocation
-        )
+        MapCameraAnimator(cameraPositionState, currentMapLatLng, defaultLocation)
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(isMyLocationEnabled = false),
-            uiSettings = MapUiSettings(
-                myLocationButtonEnabled = true,
-                zoomControlsEnabled = false
-            )
+            uiSettings = MapUiSettings(myLocationButtonEnabled = true, zoomControlsEnabled = false)
         ) {
             currentMapLatLng?.let { validLatLng ->
                 UserMarker(
                     position = validLatLng,
                     batteryPercentage = batteryPercentage,
                     userStatus = userStatus,
-                    initials = "OP" // Replace "OP" with dynamic initials
+                    initials = "OP",
+                    shouldShowBattery = shouldShowBattery,
+                    isSharingLocation = isLocationSharingPreferred
                 )
             }
         }
@@ -359,7 +377,7 @@ private fun MapCameraAnimator(
                     cameraPositionState.position.zoom < MIN_USER_LOCATION_ZOOM
         } else {
             targetZoom = DEFAULT_MAP_NO_LOCATION_ZOOM
-            needsAnimation = cameraPositionState.position.target != targetLatLng ||
+            needsAnimation = cameraPositionState.position.target != defaultLocation ||
                     cameraPositionState.position.zoom != DEFAULT_MAP_NO_LOCATION_ZOOM
         }
 
@@ -377,29 +395,33 @@ private fun UserMarker(
     position: LatLng,
     batteryPercentage: Int,
     userStatus: String,
-    initials: String
+    initials: String,
+    shouldShowBattery: Boolean,
+    isSharingLocation: Boolean
 ) {
     MarkerComposable(
-        keys = arrayOf(batteryPercentage, userStatus, position),
+        keys = arrayOf(batteryPercentage, userStatus, position, shouldShowBattery, isSharingLocation),
         state = MarkerState(position = position),
         anchor = Offset(MARKER_ANCHOR_X, MARKER_ANCHOR_Y)
     ) {
-        Box {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(MARKER_ELEMENT_SPACING_DP)
             ) {
-                Spacer(modifier = Modifier.height(MARKER_BATTERY_SPACER_HEIGHT_DP))
-                ProfileMarker(initials = initials)
-                StatusIndicator(status = userStatus)
+                if (shouldShowBattery) {
+                    BatteryIndicator(batteryPercentage = batteryPercentage)
+                }
+                Icon(
+                    imageVector = if (isSharingLocation) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                    contentDescription = if (isSharingLocation) "Location Sharing ON" else "Location Sharing OFF",
+                    tint = if (isSharingLocation) MaterialTheme.colorScheme.primary else Color.Gray,
+                    modifier = Modifier.size(SHARING_ICON_SIZE_DP)
+                )
             }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(x = BATTERY_INDICATOR_OFFSET_X_DP.dp)
-            ) {
-                BatteryIndicator(batteryPercentage = batteryPercentage)
-            }
+            Spacer(modifier = Modifier.height(4.dp))
+            ProfileMarker(initials = initials)
+            StatusIndicator(status = userStatus)
         }
     }
 }
@@ -418,6 +440,7 @@ private data class LocationUpdateParams(
 @Composable
 private fun ManageLocationUpdatesEffect(
     locationPermissionGranted: Boolean,
+    // isLocationSharingPreferredSetting removed from params
     onLocationUpdate: (Location?) -> Unit,
     onUiMessage: (String) -> Unit,
     onShowLocationDisabledAlert: (Boolean) -> Unit
@@ -425,81 +448,52 @@ private fun ManageLocationUpdatesEffect(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(lifecycleOwner, locationPermissionGranted) {
+    DisposableEffect(lifecycleOwner, locationPermissionGranted) { // Only depends on permission now
         if (!locationPermissionGranted) {
             onLocationUpdate(null)
-            onDispose {
-                Log.d(
-                    TAG,
-                    "ManageLocationUpdatesEffect: No permissions, no cleanup needed."
-                )
-            }
+            onUiMessage(MSG_PERM_DENIED) // Keep this important message
+            onDispose { Log.d(TAG, "MLUE: No permissions.") }
         } else {
-            val locationManager =
-                context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
             val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-            val isNetworkEnabled =
-                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+            val isNetworkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
 
             if (!isGpsEnabled && !isNetworkEnabled) {
                 onShowLocationDisabledAlert(true)
                 onLocationUpdate(null)
-                onUiMessage("Enable Location Services for live tracking.")
-                onDispose {
-                    Log.d(
-                        TAG,
-                        "ManageLocationUpdatesEffect: Location services disabled, no cleanup needed."
-                    )
-                }
-            } else {
+                onUiMessage(MSG_DEVICE_LOCATION_OFF) // Keep this important message
+                onDispose { Log.d(TAG, "MLUE: Device location off.") }
+            } else { // Permissions granted, device location on
                 onShowLocationDisabledAlert(false)
+                onUiMessage("") // Clear any previous message; tracking will commence
 
                 val locationListener = createLocationListener(
                     context = context,
                     onLocationUpdate = onLocationUpdate,
-                    onUiMessage = onUiMessage,
+                    onUiMessage = onUiMessage, // For provider status changes
                     onShowLocationDisabledAlert = onShowLocationDisabledAlert,
                     onReCheckAfterProviderEnabled = {
-                        Log.d(TAG, "A provider was re-enabled.")
+                        onUiMessage(MSG_PROVIDER_RE_ENABLED)
                     }
                 )
                 val params = LocationUpdateParams(
-                    context = context,
-                    locationManager = locationManager,
-                    listener = locationListener,
-                    isGpsEnabled = isGpsEnabled,
-                    isNetworkEnabled = isNetworkEnabled,
-                    onLocationUpdate = onLocationUpdate,
-                    onUiMessage = onUiMessage
+                    context, locationManager, locationListener,
+                    isGpsEnabled, isNetworkEnabled, onLocationUpdate, onUiMessage
                 )
                 try {
                     requestLastKnownAndUpdates(params)
                 } catch (e: SecurityException) {
-                    Log.e(TAG, "SecurityException during location setup: ${e.message}", e)
-                    onLocationUpdate(null)
-                    onUiMessage("Location permission error.")
+                    Log.e(TAG, "SecurityException: ${e.message}", e)
+                    onLocationUpdate(null); onUiMessage(MSG_LOCATION_ERROR)
                 } catch (e: IllegalArgumentException) {
-                    Log.e(TAG, "IllegalArgumentException during location setup: ${e.message}", e)
-                    onLocationUpdate(null)
-                    onUiMessage("Configuration error for location updates.")
+                    Log.e(TAG, "IllegalArgumentException: ${e.message}", e)
+                    onLocationUpdate(null); onUiMessage(MSG_LOCATION_CONFIG_ERROR)
                 }
                 onDispose {
-                    Log.d(TAG, "Removing location updates from listener.")
-                    try {
-                        locationManager.removeUpdates(locationListener)
-                    } catch (secEx: SecurityException) {
-                        Log.e(
-                            TAG,
-                            "SecurityException removing location updates: ${secEx.message}",
-                            secEx
-                        )
-                    } catch (argEx: IllegalArgumentException) {
-                        Log.e(
-                            TAG,
-                            "IllegalArgumentException removing location updates: ${argEx.message}",
-                            argEx
-                        )
-                    }
+                    Log.d(TAG, "Removing location updates.")
+                    try { locationManager.removeUpdates(locationListener) }
+                    catch (secEx: SecurityException) { Log.e(TAG, "SecEx rm: ${secEx.message}", secEx) }
+                    catch (argEx: IllegalArgumentException) { Log.e(TAG, "ArgEx rm: ${argEx.message}", argEx) }
                 }
             }
         }
@@ -515,32 +509,23 @@ private fun createLocationListener(
 ): LocationListener {
     return object : LocationListener {
         override fun onLocationChanged(location: Location) {
-            Log.d(TAG, "Location changed (lat/lng): ${location.latitude}, ${location.longitude}")
             onLocationUpdate(location)
         }
-
         override fun onProviderEnabled(provider: String) {
-            Log.d(TAG, "Provider enabled: $provider")
-            onUiMessage("$provider enabled. Re-checking services...")
+            // Message now indicates specific provider, not general tracking
+            onUiMessage("$provider enabled.")
             onReCheckAfterProviderEnabled()
         }
-
         override fun onProviderDisabled(provider: String) {
-            Log.d(TAG, "Provider disabled: $provider")
             val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-            if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER) &&
-                !lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-            ) {
-                onShowLocationDisabledAlert(true)
-                onLocationUpdate(null)
-                onUiMessage("All location services disabled.")
+            if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER) && !lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                onShowLocationDisabledAlert(true); onLocationUpdate(null); onUiMessage(MSG_PROVIDER_DISABLED_ALL_OFF)
             } else {
-                onUiMessage("$provider disabled. Other providers might be active.")
+                onUiMessage(MSG_PROVIDER_DISABLED_SOME_OFF)
             }
         }
-
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
-            Log.d(TAG, "Provider $provider status changed to $status")
+            Log.d(TAG, "Provider $provider status: $status")
         }
     }
 }
@@ -548,67 +533,39 @@ private fun createLocationListener(
 @SuppressLint("MissingPermission")
 private fun requestLastKnownAndUpdates(params: LocationUpdateParams) {
     var lastKnownLoc: Location? = null
-    if (params.isGpsEnabled) {
-        lastKnownLoc = params.locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-    }
-    if (lastKnownLoc == null && params.isNetworkEnabled) {
-        lastKnownLoc = params.locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+    if (params.isGpsEnabled) lastKnownLoc = params.locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+    if (lastKnownLoc == null && params.isNetworkEnabled) lastKnownLoc = params.locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+
+    if (lastKnownLoc != null) {
+        params.onLocationUpdate(lastKnownLoc)
+        // No uiMessage set here for "tracking active"
+    } else {
+        // No uiMessage set here for "waiting for location"
+        // Let MapScreen's initial state or other effect logic handle initial message if any
     }
 
-    lastKnownLoc?.let {
-        params.onLocationUpdate(it)
-        params.onUiMessage(LOCATION_TRACKING_ACTIVE_MESSAGE)
-    } ?: params.onUiMessage("No last known location. Waiting for new updates...")
-
-    if (params.isGpsEnabled) {
-        params.locationManager.requestLocationUpdates(
-            LocationManager.GPS_PROVIDER,
-            LOCATION_UPDATE_INTERVAL_MS,
-            LOCATION_UPDATE_MIN_DISTANCE_M,
-            params.listener
-        )
-        Log.d(TAG, "Requested GPS location updates.")
-    }
-    if (params.isNetworkEnabled) {
-        params.locationManager.requestLocationUpdates(
-            LocationManager.NETWORK_PROVIDER,
-            LOCATION_UPDATE_INTERVAL_MS,
-            LOCATION_UPDATE_MIN_DISTANCE_M,
-            params.listener
-        )
-        Log.d(TAG, "Requested Network location updates.")
-    }
+    if (params.isGpsEnabled) params.locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, LOCATION_UPDATE_INTERVAL_MS, LOCATION_UPDATE_MIN_DISTANCE_M, params.listener)
+    if (params.isNetworkEnabled) params.locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, LOCATION_UPDATE_INTERVAL_MS, LOCATION_UPDATE_MIN_DISTANCE_M, params.listener)
 }
 
 @Composable
-fun LocationPermissionRationaleDialog(
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
+fun LocationPermissionRationaleDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Location Permission Needed") },
-        text = { Text("This app uses your location to show it on the map. Please grant the permission for the best experience.") },
+        text = { Text("This app uses your location to show it on the map. Please grant the permission.") },
         confirmButton = { Button(onClick = onConfirm) { Text("Grant") } },
         dismissButton = { Button(onClick = onDismiss) { Text("Cancel") } }
     )
 }
 
 @Composable
-fun LocationServicesDisabledDialog(
-    context: Context,
-    onDismiss: () -> Unit
-) {
+fun LocationServicesDisabledDialog(context: Context, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Location Services Disabled") },
         text = { Text("Please enable GPS or Network location services for live location updates.") },
-        confirmButton = {
-            Button(onClick = {
-                onDismiss()
-                context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
-            }) { Text("Open Settings") }
-        },
+        confirmButton = { Button(onClick = { onDismiss(); context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }) { Text("Open Settings") } },
         dismissButton = { Button(onClick = onDismiss) { Text("Dismiss") } }
     )
 }
@@ -622,20 +579,13 @@ fun BatteryIndicator(batteryPercentage: Int) {
     }
     Card(
         shape = BATTERY_INDICATOR_SHAPE,
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = CARD_DEFAULT_ELEVATION_DP
-        ),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = CARD_BACKGROUND_ALPHA)
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = CARD_DEFAULT_ELEVATION_DP),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = CARD_BACKGROUND_ALPHA))
     ) {
         Row(
-            modifier = Modifier.padding(
-                horizontal = BATTERY_INDICATOR_PADDING_HORIZONTAL_DP,
-                vertical = BATTERY_INDICATOR_PADDING_VERTICAL_DP
-            ),
+            modifier = Modifier.padding(horizontal = BATTERY_INDICATOR_PADDING_HORIZONTAL_DP, vertical = BATTERY_INDICATOR_PADDING_VERTICAL_DP),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(BATTERY_INDICATOR_SPACING_DP)
+            horizontalArrangement = Arrangement.spacedBy(BATTERY_INDICATOR_INTERNAL_SPACING_DP)
         ) {
             val icon = when {
                 batteryPercentage > BATTERY_LEVEL_FULL -> Icons.Filled.BatteryFull
@@ -645,18 +595,8 @@ fun BatteryIndicator(batteryPercentage: Int) {
                 batteryPercentage > BATTERY_LEVEL_LOW -> Icons.Filled.Battery1Bar
                 else -> Icons.Filled.BatteryAlert
             }
-            Icon(
-                imageVector = icon,
-                contentDescription = "Battery Level",
-                tint = batteryColor,
-                modifier = Modifier.size(BATTERY_ICON_SIZE_DP)
-            )
-            Text(
-                text = "$batteryPercentage%",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color.Black.copy(alpha = TEXT_PRIMARY_ALPHA)
-            )
+            Icon(imageVector = icon, contentDescription = "Battery Level", tint = batteryColor, modifier = Modifier.size(BATTERY_ICON_SIZE_DP))
+            Text(text = "$batteryPercentage%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.Black.copy(alpha = TEXT_PRIMARY_ALPHA))
         }
     }
 }
@@ -666,30 +606,15 @@ fun StatusIndicator(status: String) {
     Card(
         modifier = Modifier.padding(top = MARKER_STATUS_PADDING_TOP_DP),
         shape = STATUS_INDICATOR_SHAPE,
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = CARD_DEFAULT_ELEVATION_DP
-        ),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = CARD_BACKGROUND_ALPHA)
-        ),
-        border = BorderStroke(
-            MARKER_STATUS_BORDER_WIDTH_DP,
-            Color.Black.copy(alpha = UI_MESSAGE_BACKGROUND_ALPHA)
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = CARD_DEFAULT_ELEVATION_DP),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = CARD_BACKGROUND_ALPHA)),
+        border = BorderStroke(MARKER_STATUS_BORDER_WIDTH_DP, Color.Black.copy(alpha = UI_MESSAGE_BACKGROUND_ALPHA))
     ) {
         Box(
-            modifier = Modifier.padding(
-                horizontal = MARKER_STATUS_PADDING_HORIZONTAL_DP,
-                vertical = MARKER_STATUS_PADDING_VERTICAL_DP
-            ),
+            modifier = Modifier.padding(horizontal = MARKER_STATUS_PADDING_HORIZONTAL_DP, vertical = MARKER_STATUS_PADDING_VERTICAL_DP),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = status,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.Black.copy(alpha = TEXT_PRIMARY_ALPHA)
-            )
+            Text(text = status, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Black.copy(alpha = TEXT_PRIMARY_ALPHA))
         }
     }
 }
@@ -701,18 +626,9 @@ fun ProfileMarker(initials: String) {
             .size(MARKER_PROFILE_SIZE_DP)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.primaryContainer)
-            .border(
-                width = MARKER_BORDER_WIDTH_DP,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = CircleShape
-            ),
+            .border(width = MARKER_BORDER_WIDTH_DP, color = MaterialTheme.colorScheme.onPrimaryContainer, shape = CircleShape),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = initials,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Text(text = initials, color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 24.sp, fontWeight = FontWeight.Bold)
     }
 }

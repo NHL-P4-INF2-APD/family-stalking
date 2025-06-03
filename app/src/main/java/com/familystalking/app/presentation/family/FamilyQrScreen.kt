@@ -88,7 +88,7 @@ fun FamilyQrScreen(
         androidx.compose.foundation.layout.Box(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            com.familystalking.app.presentation.navigation.bottomNavBar(
+            com.familystalking.app.presentation.navigation.BottomNavBar(
                 currentRoute = com.familystalking.app.presentation.navigation.Screen.Family.route,
                 navController = navController
             )
