@@ -30,12 +30,12 @@ import com.familystalking.app.presentation.family.CameraScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
 import com.familystalking.app.ui.theme.PrimaryGreen
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.remember
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
+import com.familystalking.app.presentation.agenda.AddEventScreen // Import AddEventScreen
+import com.familystalking.app.presentation.agenda.AgendaScreen
 import com.familystalking.app.presentation.family.FamilyViewModel
 
 @AndroidEntryPoint
@@ -51,7 +51,6 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     val viewModel: MainViewModel = hiltViewModel()
                     val sessionState by viewModel.sessionState.collectAsState()
-                    val snackbarHostState = remember { SnackbarHostState() }
                     val familyViewModel: FamilyViewModel = hiltViewModel()
                     val state by familyViewModel.state.collectAsState()
 
@@ -62,18 +61,26 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(sessionState) {
                         when (sessionState) {
                             SessionState.Authenticated -> {
-                                navController.navigate(Screen.Map.route) {
-                                    popUpTo(Screen.Login.route) { inclusive = true }
+                                val mainAuthenticatedRoutes = listOf(
+                                    Screen.Map.route, Screen.Agenda.route, Screen.AddEvent.route,
+                                    Screen.Family.route, Screen.Settings.route
+                                )
+                                if (navController.currentDestination?.route !in mainAuthenticatedRoutes &&
+                                    navController.currentBackStack.value.none { entry -> entry.destination.route in mainAuthenticatedRoutes }) {
+                                    navController.navigate(Screen.Map.route) {
+                                        popUpTo(Screen.Login.route) { inclusive = true }
+                                    }
                                 }
                             }
                             SessionState.Unauthenticated -> {
-                                if (navController.currentDestination?.route != Screen.Login.route) {
+                                val authRoutes = listOf(Screen.Login.route, Screen.Signup.route, Screen.ForgotPassword.route)
+                                if (navController.currentDestination?.route !in authRoutes) {
                                     navController.navigate(Screen.Login.route) {
                                         popUpTo(0) { inclusive = true }
                                     }
                                 }
                             }
-                            SessionState.Loading -> { /* Do nothing while loading */ }
+                            SessionState.Loading -> { }
                         }
                     }
 
@@ -81,65 +88,40 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = Screen.Login.route
                     ) {
-                        composable(Screen.Login.route) {
-                            LoginScreen(navController)
-                        }
-                        composable(Screen.Signup.route) {
-                            SignupScreen(navController)
-                        }
-                        composable(Screen.ForgotPassword.route) {
-                            ForgotPasswordScreen(navController)
-                        }
-                        composable(Screen.Home.route) {
-                            HomeScreen(navController)
-                        }
-                        composable(Screen.Map.route) {
-                            MapScreen(navController)
-                        }
-                        composable(Screen.Agenda.route) {
-
-                            HomeScreen(navController)
-                        }
-                        composable(Screen.Family.route) {
-                            FamilyScreen(navController)
-                        }
-                        composable(Screen.FamilyQr.route) {
-                            FamilyQrScreen(navController)
-                        }
-                        composable(Screen.Settings.route) {
-                            SettingsScreen(navController)
-                        }
-                        composable("camera") {
-                            CameraScreen(navController = navController)
-                        }
+                        composable(Screen.Login.route) { LoginScreen(navController) }
+                        composable(Screen.Signup.route) { SignupScreen(navController) }
+                        composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
+                        composable(Screen.Home.route) { HomeScreen(navController) }
+                        composable(Screen.Map.route) { MapScreen(navController) }
+                        composable(Screen.Agenda.route) { AgendaScreen(navController = navController) }
+                        composable(Screen.AddEvent.route) { AddEventScreen(navController = navController) } // Added route
+                        composable(Screen.Family.route) { FamilyScreen(navController) }
+                        composable(Screen.FamilyQr.route) { FamilyQrScreen(navController) }
+                        composable(Screen.Settings.route) { SettingsScreen(navController = navController) }
+                        composable(Screen.Camera.route) { CameraScreen(navController = navController) }
                     }
 
-                    // Global friendship request dialog
-                    state.pendingRequests.forEach { request ->
+                    state.pendingRequests.takeIf { it.isNotEmpty() }?.firstOrNull()?.let { request ->
                         AlertDialog(
                             onDismissRequest = { familyViewModel.dismissRequestDialog() },
                             title = { Text("Friend Request") },
-                            text = { Text("${request.senderId} wants to add you to their family") },
+                            text = { Text("${request.senderId ?: request.senderId} wants to add you to their family.") },
                             confirmButton = {
                                 Button(
                                     onClick = { familyViewModel.acceptFriendshipRequest(request.id) },
                                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
-                                ) {
-                                    Text("Accept")
-                                }
+                                ) { Text("Accept") }
                             },
                             dismissButton = {
-                                TextButton(onClick = { familyViewModel.rejectFriendshipRequest(request.id) }) {
-                                    Text("Reject")
-                                }
+                                TextButton(onClick = { familyViewModel.rejectFriendshipRequest(request.id) }) { Text("Reject") }
                             }
                         )
                     }
 
-                    // Global error snackbar
                     state.error?.let { error ->
                         LaunchedEffect(error) {
-                            // Show error snackbar
+                            // snackbarHostState.showSnackbar(message = error, duration = SnackbarDuration.Short)
+                            // familyViewModel.clearError()
                         }
                     }
                 }
