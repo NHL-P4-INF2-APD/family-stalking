@@ -110,6 +110,7 @@ dependencies {
 
     // CameraX
     implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
     // For ImageAnalysis and QR Code scanning

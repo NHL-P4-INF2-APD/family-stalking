@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 
 @Composable
 fun FamilyQrScreen(
@@ -32,6 +33,10 @@ fun FamilyQrScreen(
     val state by viewModel.state.collectAsState()
     val currentUser = state.currentUser
     val currentUserId = state.currentUserId
+    
+    LaunchedEffect(Unit) {
+        viewModel.fetchCurrentUser()
+    }
     
     Box(
         modifier = Modifier
@@ -62,7 +67,7 @@ fun FamilyQrScreen(
             )
             Spacer(modifier = Modifier.height(32.dp))
             Text(
-                text = currentUser?.name ?: "...",
+                text = currentUser?.name ?: "Unknown",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium
             )
