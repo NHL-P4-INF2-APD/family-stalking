@@ -119,7 +119,7 @@ fun FamilyScreen(
             }
         }
         FloatingActionButton(
-            onClick = { navController.navigate(Screen.Family.route + "/qr") },
+            onClick = { navController.navigate(Screen.FamilyQr.route) },
             containerColor = PrimaryGreen,
             contentColor = Color.White,
             modifier = Modifier
