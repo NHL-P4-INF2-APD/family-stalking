@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Settings.route) {
                             SettingsScreen(navController)
                         }
-                        composable("camera") {
+                        composable(Screen.Camera.route) {
                             CameraScreen(navController = navController)
                         }
                     }

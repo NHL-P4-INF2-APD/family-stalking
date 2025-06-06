@@ -46,7 +46,7 @@ class FamilyViewModel @Inject constructor(
         }
     }
 
-    private fun fetchCurrentUser() {
+    fun fetchCurrentUser() {
         viewModelScope.launch {
             val user = familyRepository.getCurrentUser()
             _state.value = _state.value.copy(

@@ -1,6 +1,7 @@
 package com.familystalking.app.presentation.family
 
 import android.Manifest
+import android.util.Log
 import android.util.Size
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -28,6 +30,7 @@ import com.google.zxing.common.HybridBinarizer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.navigation.NavController
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.familystalking.app.ui.theme.PrimaryGreen
@@ -35,13 +38,15 @@ import com.familystalking.app.ui.theme.PrimaryGreen
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun CameraScreen(
-    navController: NavController? = null,
+    navController: NavController,
     viewModel: FamilyViewModel = hiltViewModel()
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
     val cameraPermissionState = rememberPermissionState(Manifest.permission.CAMERA)
     var scannedCode by remember { mutableStateOf<String?>(null) }
     val state by viewModel.state.collectAsState()
+    val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
 
     LaunchedEffect(Unit) {
         if (cameraPermissionState.status is PermissionStatus.Denied) {
@@ -50,64 +55,27 @@ fun CameraScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        if (navController != null) {
-            IconButton(
-                onClick = { navController.popBackStack() },
-                modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back"
-                )
-            }
-        }
-
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             when (cameraPermissionState.status) {
                 is PermissionStatus.Granted -> {
                     AndroidView(
                         factory = { ctx ->
                             val previewView = PreviewView(ctx)
-                            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                            cameraProviderFuture.addListener({
-                                val cameraProvider = cameraProviderFuture.get()
-                                val preview = Preview.Builder().build().also {
-                                    it.setSurfaceProvider(previewView.surfaceProvider)
-                                }
-                                val imageAnalyzer = ImageAnalysis.Builder()
-                                    .setResolutionSelector(
-                                        ResolutionSelector.Builder()
-                                            .setResolutionStrategy(
-                                                ResolutionStrategy(
-                                                    Size(1280, 720),
-                                                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
-                                                )
-                                            )
-                                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
-                                            .build()
-                                    )
-                                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                    .build()
-                                imageAnalyzer.setAnalyzer(Executors.newSingleThreadExecutor()) { imageProxy ->
-                                    processImageProxy(imageProxy) { result ->
-                                        if (result != null && scannedCode == null) {
-                                            scannedCode = result
-                                            // Split the QR code data to get user ID and name
-                                            val parts = result.split("|")
-                                            if (parts.size == 2) {
-                                                viewModel.handleScannedQrCode(parts[0], parts[1])
-                                            }
+                            startCamera(
+                                context = ctx,
+                                lifecycleOwner = lifecycleOwner,
+                                previewView = previewView,
+                                cameraExecutor = cameraExecutor,
+                                onQrCodeScanned = { result ->
+                                    if (result != null && scannedCode == null) {
+                                        scannedCode = result
+                                        val parts = result.split("|")
+                                        if (parts.size == 2) {
+                                            viewModel.handleScannedQrCode(parts[0], parts[1])
                                         }
                                     }
                                 }
-                                cameraProvider.unbindAll()
-                                cameraProvider.bindToLifecycle(
-                                    lifecycleOwner,
-                                    CameraSelector.DEFAULT_BACK_CAMERA,
-                                    preview,
-                                    imageAnalyzer
-                                )
-                            }, ContextCompat.getMainExecutor(ctx))
+                            )
                             previewView
                         },
                         modifier = Modifier.fillMaxSize()
@@ -122,6 +90,16 @@ fun CameraScreen(
                     }
                 }
             }
+        }
+
+        IconButton(
+            onClick = { navController.popBackStack() },
+            modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back"
+            )
         }
 
         // Add Friend Dialog
@@ -153,6 +131,63 @@ fun CameraScreen(
             }
         }
     }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+        }
+    }
+}
+
+private fun startCamera(
+    context: android.content.Context,
+    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
+    previewView: PreviewView,
+    cameraExecutor: ExecutorService,
+    onQrCodeScanned: (String?) -> Unit
+) {
+    val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+    cameraProviderFuture.addListener({
+        try {
+            Log.d("CameraScreen", "Camera provider future complete.")
+            val cameraProvider = cameraProviderFuture.get()
+
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(1280, 720),
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                            )
+                        )
+                        .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+                        .build()
+                )
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+
+            imageAnalyzer.setAnalyzer(cameraExecutor) { imageProxy ->
+                processImageProxy(imageProxy, onQrCodeScanned)
+            }
+
+            cameraProvider.unbindAll()
+            Log.d("CameraScreen", "Binding camera to lifecycle.")
+            cameraProvider.bindToLifecycle(
+                lifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                preview,
+                imageAnalyzer
+            )
+            Log.d("CameraScreen", "Camera bound successfully.")
+        } catch (e: Exception) {
+            Log.e("CameraScreen", "Use case binding failed", e)
+        }
+    }, ContextCompat.getMainExecutor(context))
 }
 
 private fun processImageProxy(imageProxy: ImageProxy, onQrCodeScanned: (String?) -> Unit) {
