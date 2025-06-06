@@ -11,13 +11,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.familystalking.app.domain.model.SessionState
 import com.familystalking.app.presentation.MainViewModel
+import com.familystalking.app.presentation.agenda.AddEventScreen
+import com.familystalking.app.presentation.agenda.AgendaScreen
+import com.familystalking.app.presentation.family.CameraScreen
+import com.familystalking.app.presentation.family.FamilyQrScreen
+import com.familystalking.app.presentation.family.FamilyScreen
+import com.familystalking.app.presentation.family.FamilyViewModel
 import com.familystalking.app.presentation.forgotpassword.ForgotPasswordScreen
 import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
@@ -25,24 +33,17 @@ import com.familystalking.app.presentation.map.MapScreen
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.settings.SettingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
-import com.familystalking.app.presentation.family.FamilyScreen
-import com.familystalking.app.presentation.family.FamilyQrScreen
-import com.familystalking.app.presentation.family.CameraScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
 import com.familystalking.app.ui.theme.PrimaryGreen
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.remember
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.unit.dp
-import com.familystalking.app.presentation.family.FamilyViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -78,12 +79,20 @@ class MainActivity : ComponentActivity() {
                         LaunchedEffect(sessionState) {
                             when (sessionState) {
                                 SessionState.Authenticated -> {
-                                    navController.navigate(Screen.Map.route) {
-                                        popUpTo(Screen.Login.route) { inclusive = true }
+                                    val mainAuthenticatedRoutes = listOf(
+                                        Screen.Map.route, Screen.Agenda.route, Screen.AddEvent.route,
+                                        Screen.Family.route, Screen.Settings.route
+                                    )
+                                    if (navController.currentDestination?.route !in mainAuthenticatedRoutes &&
+                                        navController.currentBackStack.value.none { entry -> entry.destination.route in mainAuthenticatedRoutes }) {
+                                        navController.navigate(Screen.Map.route) {
+                                            popUpTo(Screen.Login.route) { inclusive = true }
+                                        }
                                     }
                                 }
                                 SessionState.Unauthenticated -> {
-                                    if (navController.currentDestination?.route != Screen.Login.route) {
+                                    val authRoutes = listOf(Screen.Login.route, Screen.Signup.route, Screen.ForgotPassword.route)
+                                    if (navController.currentDestination?.route !in authRoutes) {
                                         navController.navigate(Screen.Login.route) {
                                             popUpTo(0) { inclusive = true }
                                         }
@@ -97,37 +106,17 @@ class MainActivity : ComponentActivity() {
                             navController = navController,
                             startDestination = Screen.Login.route
                         ) {
-                            composable(Screen.Login.route) {
-                                LoginScreen(navController)
-                            }
-                            composable(Screen.Signup.route) {
-                                SignupScreen(navController)
-                            }
-                            composable(Screen.ForgotPassword.route) {
-                                ForgotPasswordScreen(navController)
-                            }
-                            composable(Screen.Home.route) {
-                                HomeScreen(navController)
-                            }
-                            composable(Screen.Map.route) {
-                                MapScreen(navController)
-                            }
-                            composable(Screen.Agenda.route) {
-
-                                HomeScreen(navController)
-                            }
-                            composable(Screen.Family.route) {
-                                FamilyScreen(navController)
-                            }
-                            composable(Screen.FamilyQr.route) {
-                                FamilyQrScreen(navController)
-                            }
-                            composable(Screen.Settings.route) {
-                                SettingsScreen(navController)
-                            }
-                            composable(Screen.Camera.route) {
-                                CameraScreen(navController = navController)
-                            }
+                            composable(Screen.Login.route) { LoginScreen(navController) }
+                            composable(Screen.Signup.route) { SignupScreen(navController) }
+                            composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
+                            composable(Screen.Home.route) { HomeScreen(navController) }
+                            composable(Screen.Map.route) { MapScreen(navController) }
+                            composable(Screen.Agenda.route) { AgendaScreen(navController = navController) }
+                            composable(Screen.AddEvent.route) { AddEventScreen(navController = navController) }
+                            composable(Screen.Family.route) { FamilyScreen(navController) }
+                            composable(Screen.FamilyQr.route) { FamilyQrScreen(navController) }
+                            composable(Screen.Settings.route) { SettingsScreen(navController = navController) }
+                            composable(Screen.Camera.route) { CameraScreen(navController = navController) }
                         }
 
                         // Global friendship request dialog
