@@ -118,13 +118,24 @@ fun CameraScreen(
                 confirmButton = {
                     Button(
                         onClick = { viewModel.sendFriendshipRequest() },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen),
+                        enabled = !state.isSendingFriendRequest
                     ) {
-                        Text("Add")
+                        if (state.isSendingFriendRequest) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White
+                            )
+                        } else {
+                            Text("Add")
+                        }
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.dismissAddFriendDialog() }) {
+                    TextButton(
+                        onClick = { viewModel.dismissAddFriendDialog() },
+                        enabled = !state.isSendingFriendRequest
+                    ) {
                         Text("Cancel")
                     }
                 }
