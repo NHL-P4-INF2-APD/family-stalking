@@ -104,7 +104,8 @@ class FamilyRepositoryImpl @Inject constructor(
                 return Result.failure(Exception("You cannot add yourself as a friend."))
             }
 
-            val existingRequest = supabaseClient.from("friendship_requests").select {
+            // Find all existing requests (in either direction) between the two users
+            val existingRequests = supabaseClient.from("friendship_requests").select {
                 filter {
                     or {
                         and {
@@ -119,10 +120,25 @@ class FamilyRepositoryImpl @Inject constructor(
                 }
             }.decodeList<FriendshipRequest>()
 
-            if (existingRequest.any { it.status == "pending" || it.status == "accepted" }) {
-                return Result.failure(Exception("A friend request has already been sent or you are already friends."))
+            // 1. Check if they are already friends
+            if (existingRequests.any { it.status == "accepted" }) {
+                return Result.failure(Exception("You are already friends with this user."))
             }
 
+            // 2. Delete any old, pending requests to avoid duplicates
+            val pendingRequestIds = existingRequests
+                .filter { it.status == "pending" }
+                .map { it.id }
+
+            if (pendingRequestIds.isNotEmpty()) {
+                supabaseClient.from("friendship_requests").delete {
+                    filter {
+                        isIn("id", pendingRequestIds)
+                    }
+                }
+            }
+            
+            // 3. Insert the new friend request
             supabaseClient.from("friendship_requests").insert(
                 FriendshipRequest(
                     id = UUID.randomUUID().toString(),

@@ -94,8 +94,6 @@ class FamilyViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             showAddFriendDialog = false,
-                            scannedUserId = null,
-                            scannedUserName = null,
                             isSendingFriendRequest = false
                         )
                     }
@@ -104,6 +102,7 @@ class FamilyViewModel @Inject constructor(
                     _state.update {
                         it.copy(
                             error = error.message,
+                            showAddFriendDialog = false,
                             isSendingFriendRequest = false
                         )
                     }
@@ -142,11 +141,13 @@ class FamilyViewModel @Inject constructor(
     }
 
     fun dismissAddFriendDialog() {
-        _state.value = _state.value.copy(
-            showAddFriendDialog = false,
-            scannedUserId = null,
-            scannedUserName = null
-        )
+        _state.update {
+            it.copy(
+                showAddFriendDialog = false,
+                scannedUserId = null,
+                scannedUserName = null
+            )
+        }
     }
 
     fun dismissRequestDialog() {
