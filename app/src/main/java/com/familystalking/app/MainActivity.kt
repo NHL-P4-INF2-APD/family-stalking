@@ -1,19 +1,19 @@
 package com.familystalking.app
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -47,135 +47,80 @@ import androidx.compose.material3.TextButton
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FamilyStalkingTheme {
                 val navController = rememberNavController()
-                val viewModel: MainViewModel = hiltViewModel()
-                val sessionState by viewModel.sessionState.collectAsState()
-                val snackbarHostState = remember { SnackbarHostState() }
+                val mainViewModel: MainViewModel = hiltViewModel()
                 val familyViewModel: FamilyViewModel = hiltViewModel()
-                val state by familyViewModel.state.collectAsState()
+                val sessionState by mainViewModel.sessionState.collectAsState()
+                val familyState by familyViewModel.state.collectAsState()
+                val snackbarHostState = remember { SnackbarHostState() }
 
-                Scaffold(
-                    snackbarHost = {
-                        SnackbarHost(
-                            hostState = snackbarHostState,
-                            modifier = Modifier.padding(bottom = 80.dp)
-                        )
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    // This LaunchedEffect handles navigation based on session state (login/logout)
+                    LaunchedEffect(sessionState) {
+                        when (sessionState) {
+                            SessionState.Unauthenticated -> {
+                                navController.navigate(Screen.Login.route) {
+                                    popUpTo(0) { inclusive = true }
+                                }
+                            }
+                            SessionState.Authenticated -> {
+                                // Navigate to map screen after successful login
+                                navController.navigate(Screen.Map.route) {
+                                    popUpTo(Screen.Login.route) { inclusive = true }
+                                }
+                            }
+                            else -> {}
+                        }
                     }
-                ) { paddingValues ->
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        color = MaterialTheme.colorScheme.background
+
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Login.route,
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        LaunchedEffect(Unit) {
-                            viewModel.checkSession()
-                        }
+                        composable(Screen.Login.route) { LoginScreen(navController) }
+                        composable(Screen.Signup.route) { SignupScreen(navController) }
+                        composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
+                        composable(Screen.Map.route) { MapScreen(navController = navController) }
+                        composable(Screen.Family.route) { FamilyScreen(navController, familyViewModel) }
+                        composable(Screen.FamilyQr.route) { FamilyQrScreen(navController, familyViewModel) }
+                        composable(Screen.Camera.route) { CameraScreen(navController, familyViewModel) }
+                        composable(Screen.Settings.route) { SettingsScreen(navController) }
+                        composable(Screen.Agenda.route) { AgendaScreen(navController = navController) }
+                        composable(Screen.AddEvent.route) { AddEventScreen(navController = navController) }
+                    }
 
-                        LaunchedEffect(sessionState) {
-                            when (sessionState) {
-                                SessionState.Authenticated -> {
-                                    val mainAuthenticatedRoutes = listOf(
-                                        Screen.Map.route, Screen.Agenda.route, Screen.AddEvent.route,
-                                        Screen.Family.route, Screen.Settings.route
-                                    )
-                                    if (navController.currentDestination?.route !in mainAuthenticatedRoutes &&
-                                        navController.currentBackStack.value.none { entry -> entry.destination.route in mainAuthenticatedRoutes }) {
-                                        navController.navigate(Screen.Map.route) {
-                                            popUpTo(Screen.Login.route) { inclusive = true }
-                                        }
-                                    }
-                                }
-                                SessionState.Unauthenticated -> {
-                                    val authRoutes = listOf(Screen.Login.route, Screen.Signup.route, Screen.ForgotPassword.route)
-                                    if (navController.currentDestination?.route !in authRoutes) {
-                                        navController.navigate(Screen.Login.route) {
-                                            popUpTo(0) { inclusive = true }
-                                        }
-                                    }
-                                }
-                                SessionState.Loading -> { /* Do nothing while loading */ }
-                            }
-                        }
-
-                        NavHost(
-                            navController = navController,
-                            startDestination = Screen.Login.route
-                        ) {
-                            composable(Screen.Login.route) { LoginScreen(navController) }
-                            composable(Screen.Signup.route) { SignupScreen(navController) }
-                            composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
-                            composable(Screen.Home.route) { HomeScreen(navController) }
-                            composable(Screen.Map.route) { MapScreen(navController) }
-                            composable(Screen.Agenda.route) { AgendaScreen(navController = navController) }
-                            composable(Screen.AddEvent.route) { AddEventScreen(navController = navController) }
-                            composable(Screen.Family.route) { FamilyScreen(navController) }
-                            composable(Screen.FamilyQr.route) { FamilyQrScreen(navController) }
-                            composable(Screen.Settings.route) { SettingsScreen(navController = navController) }
-                            composable(Screen.Camera.route) { CameraScreen(navController = navController) }
-                        }
-
-                        // Global friendship request dialog
-                        state.pendingRequests.firstOrNull()?.let { request ->
-                            AlertDialog(
-                                onDismissRequest = { familyViewModel.dismissRequestDialog() },
-                                title = { Text("Friend Request") },
-                                text = { Text("${request.senderId} wants to add you to their family") },
-                                confirmButton = {
-                                    Button(
-                                        onClick = { familyViewModel.acceptFriendshipRequest(request.id) },
-                                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
-                                    ) {
-                                        Text("Accept")
-                                    }
-                                },
-                                dismissButton = {
-                                    TextButton(onClick = { familyViewModel.rejectFriendshipRequest(request.id) }) {
-                                        Text("Reject")
-                                    }
-                                }
+                    // Global error snackbar
+                    familyState.error?.let { error ->
+                        LaunchedEffect(error) {
+                            snackbarHostState.showSnackbar(
+                                message = error,
+                                duration = SnackbarDuration.Short
                             )
+                            familyViewModel.clearError()
                         }
+                    }
 
-                        // Global error snackbar
-                        state.error?.let { error ->
-                            LaunchedEffect(error) {
-                                snackbarHostState.showSnackbar(
-                                    message = error,
-                                    duration = SnackbarDuration.Short
-                                )
-                                familyViewModel.clearError()
-                            }
-                        }
-
-                        // Global success snackbar
-                        state.successMessage?.let { message ->
-                            LaunchedEffect(message) {
-                                snackbarHostState.showSnackbar(
-                                    message = message,
-                                    duration = SnackbarDuration.Short
-                                )
-                                familyViewModel.clearSuccessMessage()
-                            }
-                        }
-
-                        // Friend Added Dialog
-                        if (state.showFriendAddedDialog) {
-                            AlertDialog(
-                                onDismissRequest = { familyViewModel.dismissFriendAddedDialog() },
-                                title = { Text("Friend Added!") },
-                                text = { Text("You and ${state.newlyAddedFriend?.name ?: "your new friend"} are now friends.") },
-                                confirmButton = {
-                                    Button(onClick = { familyViewModel.dismissFriendAddedDialog() }) {
-                                        Text("OK")
-                                    }
-                                }
+                    // Global success snackbar
+                    familyState.successMessage?.let { message ->
+                        LaunchedEffect(message) {
+                            snackbarHostState.showSnackbar(
+                                message = message,
+                                duration = SnackbarDuration.Short
                             )
+                            familyViewModel.clearSuccessMessage()
                         }
+                    }
+
+                    // This shows the friend request dialog globally, on top of any screen
+                    familyState.pendingRequests.firstOrNull()?.let { request ->
+                        // The AlertDialog is now handled in the FamilyScreen for better context
                     }
                 }
             }

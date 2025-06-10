@@ -4,10 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.familystalking.app.domain.repository.FamilyRepository
 import com.familystalking.app.data.repository.FriendshipRequest
+import com.familystalking.app.domain.repository.PendingRequest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import io.github.jan.supabase.gotrue.auth
@@ -17,7 +20,7 @@ data class FamilyScreenState(
     val familyMembers: List<FamilyMember> = emptyList(),
     val currentUser: FamilyMember? = null,
     val currentUserId: String? = null,
-    val pendingRequests: List<FriendshipRequest> = emptyList(),
+    val pendingRequests: List<PendingRequest> = emptyList(),
     val showAddFriendDialog: Boolean = false,
     val showRequestDialog: Boolean = false,
     val scannedUserId: String? = null,
@@ -39,7 +42,7 @@ class FamilyViewModel @Inject constructor(
     init {
         fetchFamilyMembers()
         fetchCurrentUser()
-        observeFriendshipChanges()
+        observePendingRequests()
     }
 
     fun getCurrentUserId(): String? = _state.value.currentUserId
@@ -62,22 +65,15 @@ class FamilyViewModel @Inject constructor(
         }
     }
 
-    private fun observeFriendshipChanges() {
+    private fun observePendingRequests() {
         viewModelScope.launch {
-            // Initial fetch to show requests on app start
-            fetchPendingRequests()
-            // Listen for any database changes and refetch the list
-            familyRepository.listenToFriendshipRequestChanges().collect {
-                fetchPendingRequests()
-            }
-        }
-    }
-
-    private fun fetchPendingRequests() {
-        viewModelScope.launch {
-            val currentUserId = _state.value.currentUserId ?: return@launch
-            val requests = familyRepository.getPendingRequestsForUser(currentUserId)
-            _state.value = _state.value.copy(pendingRequests = requests)
+            familyRepository.getPendingFriendshipRequests()
+                .catch { e ->
+                    _state.update { it.copy(error = "Failed to listen for friend requests: ${e.message}") }
+                }
+                .collect { requests ->
+                    _state.update { it.copy(pendingRequests = requests) }
+                }
         }
     }
 
@@ -90,42 +86,27 @@ class FamilyViewModel @Inject constructor(
     }
 
     fun sendFriendshipRequest() {
-        Log.d("FamilyVM", "sendFriendshipRequest called.")
-        if (_state.value.isSendingFriendRequest) {
-            Log.d("FamilyVM", "Request already in progress, ignoring.")
-            return
-        }
-
         viewModelScope.launch {
-            _state.value = _state.value.copy(isSendingFriendRequest = true)
-            Log.d("FamilyVM", "State updated to isSendingFriendRequest = true")
-            val scannedUserId = _state.value.scannedUserId ?: run {
-                Log.e("FamilyVM", "scannedUserId is null, aborting.")
-                _state.value = _state.value.copy(
-                    isSendingFriendRequest = false,
-                    error = "No user ID was scanned."
-                )
-                return@launch
-            }
-
-            Log.d("FamilyVM", "Calling repository.sendFriendshipRequest for user ID: $scannedUserId")
+            val scannedUserId = _state.value.scannedUserId ?: return@launch
+            _state.update { it.copy(isSendingFriendRequest = true) }
             familyRepository.sendFriendshipRequest(scannedUserId)
                 .onSuccess {
-                    Log.d("FamilyVM", "repository.sendFriendshipRequest succeeded.")
-                    _state.value = _state.value.copy(
-                        showAddFriendDialog = false,
-                        scannedUserId = null,
-                        scannedUserName = null,
-                        isSendingFriendRequest = false,
-                        successMessage = "Friend request sent!"
-                    )
+                    _state.update {
+                        it.copy(
+                            showAddFriendDialog = false,
+                            scannedUserId = null,
+                            scannedUserName = null,
+                            isSendingFriendRequest = false
+                        )
+                    }
                 }
                 .onFailure { error ->
-                    Log.e("FamilyVM", "repository.sendFriendshipRequest failed: ${error.message}")
-                    _state.value = _state.value.copy(
-                        error = error.message ?: "Failed to send request. The user may already be your friend.",
-                        isSendingFriendRequest = false
-                    )
+                    _state.update {
+                        it.copy(
+                            error = error.message,
+                            isSendingFriendRequest = false
+                        )
+                    }
                 }
         }
     }

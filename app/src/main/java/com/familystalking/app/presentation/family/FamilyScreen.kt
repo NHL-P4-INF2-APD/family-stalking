@@ -23,9 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.familystalking.app.domain.repository.PendingRequest
 import com.familystalking.app.presentation.navigation.Screen
-import com.familystalking.app.ui.theme.PrimaryGreen
 import com.familystalking.app.presentation.navigation.BottomNavBar
+import com.familystalking.app.ui.theme.PrimaryGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +43,14 @@ fun FamilyScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             Spacer(modifier = Modifier.height(16.dp))
+
+            if (state.pendingRequests.isNotEmpty()) {
+                PendingRequestsSection(
+                    requests = state.pendingRequests,
+                    viewModel = viewModel
+                )
+            }
+
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -146,5 +155,56 @@ fun FamilyScreen(
                 navController = navController
             )
         }
+    }
+}
+
+@Composable
+fun PendingRequestsSection(
+    requests: List<PendingRequest>,
+    viewModel: FamilyViewModel
+) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        Text(
+            "Pending Requests",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        requests.forEach { request ->
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                elevation = CardDefaults.cardElevation(2.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "${request.senderName} wants to be your friend.",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Row {
+                        Button(
+                            onClick = { viewModel.acceptFriendshipRequest(request.id) },
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
+                        ) {
+                            Text("Accept")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TextButton(onClick = { viewModel.rejectFriendshipRequest(request.id) }) {
+                            Text("Reject")
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
     }
 } 

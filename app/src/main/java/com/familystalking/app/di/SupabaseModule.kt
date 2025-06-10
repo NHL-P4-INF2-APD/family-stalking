@@ -11,6 +11,7 @@ import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.Auth
 import io.github.jan.supabase.postgrest.Postgrest
+import io.github.jan.supabase.realtime.Realtime
 import javax.inject.Singleton
 
 @Module
@@ -25,6 +26,7 @@ object SupabaseModule {
     ) {
         install(Auth)
         install(Postgrest)
+        install(Realtime)
     }
 
     @Provides
