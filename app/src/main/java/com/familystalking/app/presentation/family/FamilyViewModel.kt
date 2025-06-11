@@ -67,11 +67,14 @@ class FamilyViewModel @Inject constructor(
 
     private fun observePendingRequests() {
         viewModelScope.launch {
+            Log.d("FriendRequestFlow", "VM: Attaching observer for pending requests.")
             familyRepository.getPendingFriendshipRequests()
                 .catch { e ->
+                    Log.e("FriendRequestFlow", "VM: Flow collection error.", e)
                     _state.update { it.copy(error = "Failed to listen for friend requests: ${e.message}") }
                 }
                 .collect { requests ->
+                    Log.d("FriendRequestFlow", "VM: Received new list of ${requests.size} pending requests.")
                     _state.update { it.copy(pendingRequests = requests) }
                 }
         }
@@ -87,26 +90,27 @@ class FamilyViewModel @Inject constructor(
 
     fun sendFriendshipRequest() {
         viewModelScope.launch {
-            val scannedUserId = _state.value.scannedUserId ?: return@launch
+            val scannedUserId = _state.value.scannedUserId
+            Log.d("FriendRequestFlow", "VM: sendFriendshipRequest called for user $scannedUserId.")
+            if (scannedUserId == null) {
+                Log.e("FriendRequestFlow", "VM: Aborting, scannedUserId is null.")
+                return@launch
+            }
+
             _state.update { it.copy(isSendingFriendRequest = true) }
-            familyRepository.sendFriendshipRequest(scannedUserId)
-                .onSuccess {
-                    _state.update {
-                        it.copy(
-                            showAddFriendDialog = false,
-                            isSendingFriendRequest = false
-                        )
-                    }
-                }
-                .onFailure { error ->
-                    _state.update {
-                        it.copy(
-                            error = error.message,
-                            showAddFriendDialog = false,
-                            isSendingFriendRequest = false
-                        )
-                    }
-                }
+            val result = familyRepository.sendFriendshipRequest(scannedUserId)
+            
+            if (result.isFailure) {
+                Log.e("FriendRequestFlow", "VM: sendFriendshipRequest failed: ${result.exceptionOrNull()?.message}")
+            }
+
+            _state.update {
+                it.copy(
+                    isSendingFriendRequest = false,
+                    showAddFriendDialog = false,
+                    error = result.exceptionOrNull()?.message
+                )
+            }
         }
     }
 
@@ -157,7 +161,7 @@ class FamilyViewModel @Inject constructor(
     }
 
     fun clearError() {
-        _state.value = _state.value.copy(error = null)
+        _state.update { it.copy(error = null) }
     }
 
     fun clearSuccessMessage() {

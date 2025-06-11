@@ -38,6 +38,12 @@ internal data class FriendshipRequest(
     val users: UserName? = null
 )
 
+@Serializable
+internal data class Friend(
+    @SerialName("user_id") val userId: String,
+    @SerialName("friend_id") val friendId: String
+)
+
 internal fun FriendshipRequest.toDomain(): PendingRequest {
     return PendingRequest(
         id = this.id,
@@ -53,10 +59,24 @@ class FamilyRepositoryImpl @Inject constructor(
 
     override suspend fun getFamilyMembers(): List<FamilyMember> {
         return try {
-            val response = supabaseClient.from("family_members").select().decodeList<FamilyMemberSupabase>()
-            response.map { FamilyMember(it.name, it.status ?: "") }
+            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
+
+            // Step 1: Get the IDs of all friends from the 'friends' table
+            val friendIds = supabaseClient.from("friends").select(Columns.list("friend_id")) {
+                filter { eq("user_id", currentUserId) }
+            }.decodeList<Map<String, String>>()
+            .mapNotNull { it["friend_id"] }
+
+            if (friendIds.isEmpty()) return emptyList()
+
+            // Step 2: Get user details for the retrieved friend IDs from the 'users' table
+            val friends = supabaseClient.from("users").select {
+                filter { isIn("user_id", friendIds) }
+            }.decodeList<FamilyMemberSupabase>()
+
+            friends.map { FamilyMember(it.name, it.status ?: "") }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("FamilyRepository", "getFamilyMembers failed", e)
             emptyList()
         }
     }
@@ -96,15 +116,15 @@ class FamilyRepositoryImpl @Inject constructor(
 
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun sendFriendshipRequest(receiverId: String): Result<Unit> {
-        return try {
-            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-                ?: return Result.failure(Exception("User not authenticated"))
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+            ?: return Result.failure(Exception("SENDER: User not authenticated"))
+        Log.d("FriendRequestFlow", "SENDER: Attempting to send request from $currentUserId to $receiverId")
 
+        return try {
             if (currentUserId == receiverId) {
                 return Result.failure(Exception("You cannot add yourself as a friend."))
             }
 
-            // Find all existing requests (in either direction) between the two users
             val existingRequests = supabaseClient.from("friendship_requests").select {
                 filter {
                     or {
@@ -119,26 +139,19 @@ class FamilyRepositoryImpl @Inject constructor(
                     }
                 }
             }.decodeList<FriendshipRequest>()
+            Log.d("FriendRequestFlow", "SENDER: Found ${existingRequests.size} existing records between users.")
 
-            // 1. Check if they are already friends
             if (existingRequests.any { it.status == "accepted" }) {
+                Log.w("FriendRequestFlow", "SENDER: Blocked. Users are already friends.")
                 return Result.failure(Exception("You are already friends with this user."))
             }
 
-            // 2. Delete any old, pending requests to avoid duplicates
-            val pendingRequestIds = existingRequests
-                .filter { it.status == "pending" }
-                .map { it.id }
-
-            if (pendingRequestIds.isNotEmpty()) {
-                supabaseClient.from("friendship_requests").delete {
-                    filter {
-                        isIn("id", pendingRequestIds)
-                    }
-                }
+            if (existingRequests.any { it.status == "pending" }) {
+                Log.i("FriendRequestFlow", "SENDER: Silent success. Request already pending.")
+                return Result.success(Unit)
             }
-            
-            // 3. Insert the new friend request
+
+            // Insert the new friend request
             supabaseClient.from("friendship_requests").insert(
                 FriendshipRequest(
                     id = UUID.randomUUID().toString(),
@@ -149,21 +162,35 @@ class FamilyRepositoryImpl @Inject constructor(
                     users = null
                 )
             )
+            Log.d("FriendRequestFlow", "SENDER: Successfully inserted new friend request into database.")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e("FamilyRepository", "sendFriendshipRequest failed", e)
+            Log.e("FriendRequestFlow", "SENDER: sendFriendshipRequest failed with exception.", e)
             Result.failure(e)
         }
     }
     
     override suspend fun acceptFriendshipRequest(requestId: String): Result<Unit> {
         return try {
+            val request = supabaseClient.from("friendship_requests").select {
+                filter { eq("id", requestId) }
+            }.decodeSingle<FriendshipRequest>()
+
+            // Update request status to 'accepted'
             supabaseClient.from("friendship_requests")
                 .update({ set("status", "accepted") }) {
                     filter { eq("id", requestId) }
                 }
+            
+            // Create the two-way friendship in the 'friends' table
+            val friendship1 = Friend(userId = request.senderId, friendId = request.receiverId)
+            val friendship2 = Friend(userId = request.receiverId, friendId = request.senderId)
+            
+            supabaseClient.from("friends").insert(listOf(friendship1, friendship2))
+
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("FamilyRepository", "acceptFriendshipRequest failed", e)
             Result.failure(e)
         }
     }
@@ -181,13 +208,15 @@ class FamilyRepositoryImpl @Inject constructor(
     override fun getPendingFriendshipRequests(): Flow<List<PendingRequest>> = callbackFlow {
         val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
         if (currentUserId == null) {
-            trySend(emptyList())
-            close()
-            return@callbackFlow
+            Log.w("FriendRequestFlow", "RECEIVER: Cannot listen for requests, user is null.")
+            trySend(emptyList()); close(); return@callbackFlow
         }
+        
+        Log.d("FriendRequestFlow", "RECEIVER: Starting to listen for friend requests for user $currentUserId.")
 
         suspend fun fetchAndSend() {
             try {
+                Log.d("FriendRequestFlow", "RECEIVER: Fetching pending requests...")
                 val requests = supabaseClient.from("friendship_requests")
                     .select(
                         columns = Columns.list("*, users:sender_id(name)")
@@ -198,14 +227,13 @@ class FamilyRepositoryImpl @Inject constructor(
                         }
                     }.decodeList<FriendshipRequest>()
                     .map { it.toDomain() }
+                Log.d("FriendRequestFlow", "RECEIVER: Found ${requests.size} pending requests. Sending to UI.")
                 trySend(requests)
             } catch (e: Exception) {
-                Log.e("FamilyRepository", "Error fetching pending requests", e)
+                Log.e("FriendRequestFlow", "RECEIVER: Error fetching pending requests.", e)
                 trySend(emptyList())
             }
         }
-
-        fetchAndSend()
 
         val channel = supabaseClient.channel("friendship-requests")
         val changeJob = launch {
@@ -213,15 +241,18 @@ class FamilyRepositoryImpl @Inject constructor(
                 table = "friendship_requests"
                 filter = "receiver_id=eq.$currentUserId"
             }.collect {
+                Log.d("FriendRequestFlow", "RECEIVER: Detected a database change. Refetching requests.")
                 fetchAndSend()
             }
         }
 
         launch {
+            Log.d("FriendRequestFlow", "RECEIVER: Subscribing to realtime channel...")
             channel.subscribe()
         }
 
         awaitClose {
+            Log.d("FriendRequestFlow", "RECEIVER: Closing listener for user $currentUserId.")
             changeJob.cancel()
             launch { channel.unsubscribe() }
         }
