@@ -44,10 +44,10 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TextButton
+import com.familystalking.app.presentation.family.PendingRequestsScreen
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @RequiresApi(Build.VERSION_CODES.O)
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -94,6 +94,7 @@ class MainActivity : ComponentActivity() {
                         composable(Screen.Settings.route) { SettingsScreen(navController) }
                         composable(Screen.Agenda.route) { AgendaScreen(navController = navController) }
                         composable(Screen.AddEvent.route) { AddEventScreen(navController = navController) }
+                        composable(Screen.PendingRequests.route) { PendingRequestsScreen(navController, familyViewModel) }
                     }
 
                     // Global error snackbar

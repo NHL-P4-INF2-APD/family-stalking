@@ -235,6 +235,9 @@ class FamilyRepositoryImpl @Inject constructor(
             }
         }
 
+        // Fetch the initial data as soon as we start listening.
+        fetchAndSend()
+
         val channel = supabaseClient.channel("friendship-requests")
         val changeJob = launch {
             channel.postgresChangeFlow<PostgresAction>(schema = "public") {

@@ -10,8 +10,9 @@ sealed class Screen(val route: String) {
     object AddEvent : Screen("add_event")
     object Family : Screen("family")
     object Settings : Screen("settings")
-    object FamilyQr : Screen("family_qr")
+    object FamilyQr : Screen("family/qr")
     object Camera : Screen("camera")
+    object PendingRequests : Screen("pending_requests")
 
     companion object {
         fun fromRoute(route: String?): Screen? {
@@ -27,6 +28,7 @@ sealed class Screen(val route: String) {
                 Settings.route -> Settings
                 FamilyQr.route -> FamilyQr
                 Camera.route -> Camera
+                PendingRequests.route -> PendingRequests
                 else -> null
             }
         }

@@ -2,10 +2,13 @@ package com.familystalking.app.presentation.family
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -41,29 +44,40 @@ fun FamilyScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            if (state.pendingRequests.isNotEmpty()) {
-                PendingRequestsSection(
-                    requests = state.pendingRequests,
-                    viewModel = viewModel
-                )
-            }
-
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                placeholder = { Text("name...", color = Color.Gray) },
-                label = { Text("Search", color = Color.Gray) },
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            if (filteredMembers.isEmpty()) {
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Search family...") },
+                    shape = RoundedCornerShape(32.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(onClick = { navController.navigate(Screen.PendingRequests.route) }) {
+                    BadgedBox(
+                        badge = {
+                            if (state.pendingRequests.isNotEmpty()) {
+                                Badge { Text("${state.pendingRequests.size}") }
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Notifications,
+                            contentDescription = "Pending Requests"
+                        )
+                    }
+                }
+            }
+
+            if (filteredMembers.isEmpty() && state.familyMembers.isNotEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
                     contentAlignment = Alignment.Center
@@ -78,9 +92,20 @@ fun FamilyScreen(
                         color = Color.Gray
                     )
                 }
+            } else if (state.familyMembers.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "You haven't added any friends yet.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = Color.Gray
+                    )
+                }
             } else {
-                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
-                    filteredMembers.forEach { member ->
+                LazyColumn(modifier = Modifier.padding(horizontal = 8.dp)) {
+                    items(filteredMembers) { member ->
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -127,6 +152,7 @@ fun FamilyScreen(
                 }
             }
         }
+
         FloatingActionButton(
             onClick = { navController.navigate(Screen.FamilyQr.route) },
             containerColor = PrimaryGreen,
@@ -137,6 +163,7 @@ fun FamilyScreen(
         ) {
             Icon(Icons.Default.QrCode, contentDescription = "Show QR")
         }
+
         FloatingActionButton(
             onClick = { navController.navigate(Screen.Camera.route) },
             containerColor = PrimaryGreen,
@@ -147,6 +174,7 @@ fun FamilyScreen(
         ) {
             Icon(Icons.Filled.CameraAlt, contentDescription = "Scan QR")
         }
+
         Box(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
