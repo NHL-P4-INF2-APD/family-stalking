@@ -73,14 +73,21 @@ fun FamilyQrScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Create QR code data with both user ID and name
-            val qrData = if (currentUserId != null && currentUser != null) {
-                "$currentUserId|${currentUser.name}"
+            if (currentUserId != null && currentUser != null) {
+                // Create QR code data with both user ID and name
+                val qrData = "$currentUserId|${currentUser.name}"
+                QRCodeBox(data = qrData)
             } else {
-                "..."
+                Box(
+                    modifier = Modifier
+                        .size(200.dp)
+                        .background(Color.LightGray, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
             }
-            
-            QRCodeBox(data = qrData)
+
             Spacer(modifier = Modifier.height(48.dp))
             Text(
                 text = "Have friends scan this code to add you as a contact",

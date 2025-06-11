@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -65,13 +66,17 @@ fun FamilyScreen(
                     BadgedBox(
                         badge = {
                             if (state.pendingRequests.isNotEmpty()) {
-                                Badge { Text("${state.pendingRequests.size}") }
+                                Badge(
+                                    containerColor = PrimaryGreen,
+                                    contentColor = Color.White
+                                ) { Text("${state.pendingRequests.size}") }
                             }
                         }
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = "Pending Requests"
+                            imageVector = Icons.Default.PersonAdd,
+                            contentDescription = "Friend Requests",
+                            tint = PrimaryGreen
                         )
                     }
                 }
@@ -183,56 +188,5 @@ fun FamilyScreen(
                 navController = navController
             )
         }
-    }
-}
-
-@Composable
-fun PendingRequestsSection(
-    requests: List<PendingRequest>,
-    viewModel: FamilyViewModel
-) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-        Text(
-            "Pending Requests",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-        requests.forEach { request ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                elevation = CardDefaults.cardElevation(2.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "${request.senderName} wants to be your friend.",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Row {
-                        Button(
-                            onClick = { viewModel.acceptFriendshipRequest(request.id) },
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
-                        ) {
-                            Text("Accept")
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        TextButton(onClick = { viewModel.rejectFriendshipRequest(request.id) }) {
-                            Text("Reject")
-                        }
-                    }
-                }
-            }
-        }
-        Spacer(modifier = Modifier.height(16.dp))
     }
 } 

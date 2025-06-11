@@ -5,8 +5,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -16,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.familystalking.app.domain.repository.PendingRequest
+import com.familystalking.app.presentation.navigation.BottomNavBar
+import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.ui.theme.PrimaryGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,12 +33,30 @@ fun PendingRequestsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Friend Requests") },
+                title = { Text("Friend Requests", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                actions = {
+                    // Add the refresh button here
+                    IconButton(onClick = {
+                        state.currentUserId?.let { viewModel.fetchPendingRequests(it) }
+                    }) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
+                )
+            )
+        },
+        bottomBar = {
+            BottomNavBar(
+                currentRoute = Screen.Family.route, // Keep Family tab active
+                navController = navController
             )
         }
     ) { paddingValues ->
@@ -83,13 +105,13 @@ fun PendingRequestItem(request: PendingRequest, viewModel: FamilyViewModel) {
             )
             Row {
                 Button(
-                    onClick = { viewModel.acceptFriendshipRequest(request.id) },
+                    onClick = { viewModel.acceptFriendshipRequest(request) },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
                 ) {
                     Text("Accept")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                TextButton(onClick = { viewModel.rejectFriendshipRequest(request.id) }) {
+                TextButton(onClick = { viewModel.declineFriendshipRequest(request) }) {
                     Text("Decline")
                 }
             }

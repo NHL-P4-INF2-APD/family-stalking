@@ -15,6 +15,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import io.github.jan.supabase.gotrue.auth
 import android.util.Log
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.take
+import com.familystalking.app.domain.repository.AuthenticationRepository
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 data class FamilyScreenState(
     val familyMembers: List<FamilyMember> = emptyList(),
@@ -29,129 +36,137 @@ data class FamilyScreenState(
     val error: String? = null,
     val successMessage: String? = null,
     val newlyAddedFriend: FamilyMember? = null,
-    val showFriendAddedDialog: Boolean = false
+    val showFriendAddedDialog: Boolean = false,
+    val hasPendingRequests: Boolean = false,
+    val isLoading: Boolean = false,
+    val searchResults: List<FamilyMember> = emptyList()
 )
 
 @HiltViewModel
 class FamilyViewModel @Inject constructor(
-    private val familyRepository: FamilyRepository
+    private val familyRepository: FamilyRepository,
+    private val auth: AuthenticationRepository
 ) : ViewModel() {
     private val _state = MutableStateFlow(FamilyScreenState())
     val state: StateFlow<FamilyScreenState> = _state.asStateFlow()
 
     init {
-        fetchFamilyMembers()
+        Log.d("FriendRequestFlow", "VM: FamilyViewModel initialized by Hilt.")
         fetchCurrentUser()
-        observePendingRequests()
     }
 
     fun getCurrentUserId(): String? = _state.value.currentUserId
 
-    private fun fetchFamilyMembers() {
-        viewModelScope.launch {
-            _state.value = _state.value.copy(
-                familyMembers = familyRepository.getFamilyMembers()
-            )
-        }
-    }
-
     fun fetchCurrentUser() {
         viewModelScope.launch {
+            Log.d("FriendRequestFlow", "VM: Fetching current user...")
             val user = familyRepository.getCurrentUser()
-            _state.value = _state.value.copy(
-                currentUser = user,
-                currentUserId = familyRepository.getCurrentUserId()
-            )
+            // The user's ID can be null if something goes wrong, so we handle that.
+            val userId = user.id
+            _state.update { it.copy(currentUser = user, currentUserId = userId) }
+            Log.d("FriendRequestFlow", "VM: Fetched user: ${user.name} (ID: $userId).")
+
+            if (userId != null) {
+                Log.d("FriendRequestFlow", "VM: User ID found, now fetching their requests.")
+                fetchPendingRequests(userId) // Pass ID directly to solve race condition
+            } else {
+                Log.w("FriendRequestFlow", "VM: User ID is null after fetch, cannot get requests.")
+            }
         }
     }
 
-    private fun observePendingRequests() {
+    fun fetchFamilyMembers() {
         viewModelScope.launch {
-            Log.d("FriendRequestFlow", "VM: Attaching observer for pending requests.")
-            familyRepository.getPendingFriendshipRequests()
-                .catch { e ->
-                    Log.e("FriendRequestFlow", "VM: Flow collection error.", e)
-                    _state.update { it.copy(error = "Failed to listen for friend requests: ${e.message}") }
-                }
-                .collect { requests ->
-                    Log.d("FriendRequestFlow", "VM: Received new list of ${requests.size} pending requests.")
-                    _state.update { it.copy(pendingRequests = requests) }
-                }
+            _state.update { it.copy(isLoading = true) }
+            val members = familyRepository.getFamilyMembers()
+            _state.update { it.copy(familyMembers = members, isLoading = false) }
         }
     }
 
-    fun handleScannedQrCode(userId: String, userName: String) {
+    fun handleScannedQrCode(scannedId: String, scannedName: String) {
         _state.value = _state.value.copy(
-            scannedUserId = userId,
-            scannedUserName = userName,
+            scannedUserId = scannedId,
+            scannedUserName = scannedName,
             showAddFriendDialog = true
         )
     }
 
     fun sendFriendshipRequest() {
         viewModelScope.launch {
-            val scannedUserId = _state.value.scannedUserId
-            Log.d("FriendRequestFlow", "VM: sendFriendshipRequest called for user $scannedUserId.")
-            if (scannedUserId == null) {
-                Log.e("FriendRequestFlow", "VM: Aborting, scannedUserId is null.")
+            val friendId = _state.value.scannedUserId
+            if (friendId == null) {
+                _state.update { it.copy(error = "No user scanned.") }
                 return@launch
             }
-
+            Log.d("FriendRequestFlow", "VM: sendFriendshipRequest called for user $friendId.")
             _state.update { it.copy(isSendingFriendRequest = true) }
-            val result = familyRepository.sendFriendshipRequest(scannedUserId)
-            
-            if (result.isFailure) {
-                Log.e("FriendRequestFlow", "VM: sendFriendshipRequest failed: ${result.exceptionOrNull()?.message}")
-            }
-
-            _state.update {
-                it.copy(
-                    isSendingFriendRequest = false,
-                    showAddFriendDialog = false,
-                    error = result.exceptionOrNull()?.message
-                )
+            try {
+                familyRepository.sendFriendshipRequest(friendId)
+                _state.update { it.copy(isSendingFriendRequest = false, showAddFriendDialog = false, scannedUserId = null, scannedUserName = null) }
+            } catch (e: Exception) {
+                Log.e("FriendRequestFlow", "Error sending friendship request", e)
+                _state.update {
+                    it.copy(
+                        error = e.message ?: "Failed to send request",
+                        isSendingFriendRequest = false
+                    )
+                }
             }
         }
     }
 
-    fun acceptFriendshipRequest(requestId: String) {
+    fun acceptFriendshipRequest(request: PendingRequest) {
         viewModelScope.launch {
-            familyRepository.acceptFriendshipRequest(requestId)
-                .onSuccess {
-                    fetchFamilyMembers()
-                }
-                .onFailure { error ->
-                    _state.value = _state.value.copy(
-                        error = error.message
-                    )
-                }
+            try {
+                familyRepository.acceptFriendshipRequest(request)
+                // Refresh pending requests and family list
+                state.value.currentUserId?.let { fetchPendingRequests(it) }
+                fetchFamilyMembers()
+            } catch (e: Exception) {
+                _state.update { it.copy(error = "Failed to accept request.") }
+            }
         }
-        _state.value = _state.value.copy(
-            showRequestDialog = false
-        )
     }
 
-    fun rejectFriendshipRequest(requestId: String) {
+    fun declineFriendshipRequest(request: PendingRequest) {
         viewModelScope.launch {
-            familyRepository.rejectFriendshipRequest(requestId)
-                .onSuccess {
-                }
-                .onFailure { error ->
-                    _state.value = _state.value.copy(
-                        error = error.message
-                    )
-                }
+            try {
+                familyRepository.declineFriendshipRequest(request)
+                // Refresh pending requests
+                state.value.currentUserId?.let { fetchPendingRequests(it) }
+            } catch (e: Exception) {
+                _state.update { it.copy(error = "Failed to decline request.") }
+            }
+        }
+    }
+
+    fun fetchPendingRequests(userId: String) {
+        viewModelScope.launch {
+            try {
+                Log.d("FriendRequestFlow", "VM: Manually fetching pending requests for user $userId.")
+                val requests = familyRepository.getPendingRequests(userId)
+                _state.update { it.copy(pendingRequests = requests, hasPendingRequests = requests.isNotEmpty()) }
+                Log.d("FriendRequestFlow", "VM: Manual fetch complete. Found ${requests.size} requests.")
+            } catch (e: Exception) {
+                Log.e("FriendRequestFlow", "VM: Error during manual fetch of pending requests.", e)
+            }
+        }
+    }
+
+    fun searchUsers(query: String) {
+        viewModelScope.launch {
+            if (query.length > 2) {
+                _state.update { it.copy(isLoading = true) }
+                val result = familyRepository.searchUsers(query)
+                _state.update { it.copy(searchResults = result, isLoading = false) }
+            } else {
+                _state.update { it.copy(searchResults = emptyList()) }
+            }
         }
     }
 
     fun dismissAddFriendDialog() {
-        _state.update {
-            it.copy(
-                showAddFriendDialog = false,
-                scannedUserId = null,
-                scannedUserName = null
-            )
-        }
+        _state.update { it.copy(showAddFriendDialog = false, error = null, scannedUserId = null, scannedUserName = null) }
     }
 
     fun dismissRequestDialog() {

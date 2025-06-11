@@ -11,8 +11,11 @@ import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.realtime.PostgresAction
+import io.github.jan.supabase.realtime.Realtime
 import io.github.jan.supabase.realtime.channel
 import io.github.jan.supabase.realtime.postgresChangeFlow
+import io.github.jan.supabase.realtime.realtime
+import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -34,8 +37,7 @@ internal data class FriendshipRequest(
     @SerialName("sender_id") val senderId: String,
     @SerialName("receiver_id") val receiverId: String,
     val status: String,
-    val timestamp: String,
-    val users: UserName? = null
+    val timestamp: String
 )
 
 @Serializable
@@ -44,14 +46,13 @@ internal data class Friend(
     @SerialName("friend_id") val friendId: String
 )
 
-internal fun FriendshipRequest.toDomain(): PendingRequest {
-    return PendingRequest(
-        id = this.id,
-        senderId = this.senderId,
-        senderName = this.users?.name ?: "Unknown User",
-        timestamp = this.timestamp
-    )
-}
+// Data class for Supabase mapping (pas aan naar jouw kolommen)
+@Serializable
+data class FamilyMemberSupabase(
+    @SerialName("user_id") val userId: String,
+    val name: String,
+    val status: String? = null
+)
 
 class FamilyRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient
@@ -62,10 +63,10 @@ class FamilyRepositoryImpl @Inject constructor(
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
 
             // Step 1: Get the IDs of all friends from the 'friends' table
-            val friendIds = supabaseClient.from("friends").select(Columns.list("friend_id")) {
+            val friendIds = supabaseClient.from("friends").select {
                 filter { eq("user_id", currentUserId) }
-            }.decodeList<Map<String, String>>()
-            .mapNotNull { it["friend_id"] }
+            }.decodeList<Friend>().map { it.friendId }
+
 
             if (friendIds.isEmpty()) return emptyList()
 
@@ -74,7 +75,7 @@ class FamilyRepositoryImpl @Inject constructor(
                 filter { isIn("user_id", friendIds) }
             }.decodeList<FamilyMemberSupabase>()
 
-            friends.map { FamilyMember(it.name, it.status ?: "") }
+            friends.map { FamilyMember(it.name, it.status ?: "", it.userId) }
         } catch (e: Exception) {
             Log.e("FamilyRepository", "getFamilyMembers failed", e)
             emptyList()
@@ -86,27 +87,24 @@ class FamilyRepositoryImpl @Inject constructor(
             val authUser = supabaseClient.auth.currentUserOrNull()
             val userId = authUser?.id
             val userEmail = authUser?.email
-            // Fallback name from email
             val nameFromEmail = userEmail?.substringBefore('@')?.replaceFirstChar { it.uppercase() } ?: "Unknown"
 
             if (userId == null) {
-                return FamilyMember(nameFromEmail, "")
+                return FamilyMember(id = null, name = nameFromEmail, status = "")
             }
             
             val response = supabaseClient.from("users").select { filter { eq("user_id", userId) } }.decodeList<FamilyMemberSupabase>()
             val user = response.firstOrNull()
 
-            // Prefer database name, but use email fallback if not available
             val finalName = if (user != null && user.name.isNotBlank()) user.name else nameFromEmail
             val finalStatus = user?.status ?: ""
 
-            FamilyMember(finalName, finalStatus)
+            FamilyMember(id = userId, name = finalName, status = finalStatus)
         } catch (e: Exception) {
             e.printStackTrace()
-            // Ensure fallback works even on error
             val userEmail = supabaseClient.auth.currentUserOrNull()?.email
             val nameFromEmail = userEmail?.substringBefore('@')?.replaceFirstChar { it.uppercase() } ?: "Unknown"
-            FamilyMember(nameFromEmail, "")
+            FamilyMember(id = null, name = nameFromEmail, status = "")
         }
     }
 
@@ -158,8 +156,7 @@ class FamilyRepositoryImpl @Inject constructor(
                     senderId = currentUserId,
                     receiverId = receiverId,
                     status = "pending",
-                    timestamp = Instant.now().toString(),
-                    users = null
+                    timestamp = Instant.now().toString()
                 )
             )
             Log.d("FriendRequestFlow", "SENDER: Successfully inserted new friend request into database.")
@@ -169,101 +166,102 @@ class FamilyRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
-    
-    override suspend fun acceptFriendshipRequest(requestId: String): Result<Unit> {
+
+
+    override suspend fun acceptFriendshipRequest(request: PendingRequest): Result<Unit> {
+        Log.d("FriendRequestFlow", "RECEIVER: Attempting to accept request ID: ${request.id}")
         return try {
-            val request = supabaseClient.from("friendship_requests").select {
-                filter { eq("id", requestId) }
+            val fullRequest = supabaseClient.from("friendship_requests").select {
+                filter { eq("id", request.id) }
             }.decodeSingle<FriendshipRequest>()
 
             // Update request status to 'accepted'
             supabaseClient.from("friendship_requests")
-                .update({ set("status", "accepted") }) {
-                    filter { eq("id", requestId) }
-                }
+                .update({ set("status", "accepted") }) { filter { eq("id", request.id) } }
             
-            // Create the two-way friendship in the 'friends' table
-            val friendship1 = Friend(userId = request.senderId, friendId = request.receiverId)
-            val friendship2 = Friend(userId = request.receiverId, friendId = request.senderId)
-            
-            supabaseClient.from("friends").insert(listOf(friendship1, friendship2))
+            Log.d("FriendRequestFlow", "RECEIVER: Request status updated to 'accepted'.")
 
+            // Create the two-way friendship
+            val friendship1 = Friend(userId = fullRequest.senderId, friendId = fullRequest.receiverId)
+            val friendship2 = Friend(userId = fullRequest.receiverId, friendId = fullRequest.senderId)
+            
+            supabaseClient.from("friends").insert(friendship1)
+            supabaseClient.from("friends").insert(friendship2)
+
+            Log.i("FriendRequestFlow", "RECEIVER: Friendship records created successfully.")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e("FamilyRepository", "acceptFriendshipRequest failed", e)
+            Log.e("FriendRequestFlow", "RECEIVER: acceptFriendshipRequest failed.", e)
             Result.failure(e)
         }
     }
 
-    override suspend fun rejectFriendshipRequest(requestId: String): Result<Unit> {
+    override suspend fun declineFriendshipRequest(request: PendingRequest): Result<Unit> {
         return try {
             supabaseClient.from("friendship_requests")
-                .delete { filter { eq("id", requestId) } }
+                .delete { filter { eq("id", request.id) } }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
-    override fun getPendingFriendshipRequests(): Flow<List<PendingRequest>> = callbackFlow {
-        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-        if (currentUserId == null) {
-            Log.w("FriendRequestFlow", "RECEIVER: Cannot listen for requests, user is null.")
-            trySend(emptyList()); close(); return@callbackFlow
-        }
-        
-        Log.d("FriendRequestFlow", "RECEIVER: Starting to listen for friend requests for user $currentUserId.")
+    override suspend fun getPendingRequests(userId: String): List<PendingRequest> {
+        try {
+            Log.d("FriendRequestFlow", "RECEIVER: Manually fetching pending requests for $userId...")
+            val requestsWithoutNames = supabaseClient.from("friendship_requests")
+                .select {
+                    filter {
+                        eq("receiver_id", userId)
+                        eq("status", "pending")
+                    }
+                }.decodeList<FriendshipRequest>()
 
-        suspend fun fetchAndSend() {
-            try {
-                Log.d("FriendRequestFlow", "RECEIVER: Fetching pending requests...")
-                val requests = supabaseClient.from("friendship_requests")
-                    .select(
-                        columns = Columns.list("*, users:sender_id(name)")
-                    ) {
-                        filter {
-                            eq("receiver_id", currentUserId)
-                            eq("status", "pending")
-                        }
-                    }.decodeList<FriendshipRequest>()
-                    .map { it.toDomain() }
-                Log.d("FriendRequestFlow", "RECEIVER: Found ${requests.size} pending requests. Sending to UI.")
-                trySend(requests)
-            } catch (e: Exception) {
-                Log.e("FriendRequestFlow", "RECEIVER: Error fetching pending requests.", e)
-                trySend(emptyList())
+            val requestsWithNames = requestsWithoutNames.mapNotNull { request ->
+                val senderName = try {
+                    supabaseClient.from("users")
+                        .select { filter { eq("user_id", request.senderId) } }
+                        .decodeSingleOrNull<FamilyMemberSupabase>()?.name
+                } catch (e: Exception) {
+                    Log.e("FamilyRepo", "Could not fetch sender name for ${request.senderId}", e)
+                    null
+                }
+
+                if (senderName == null) {
+                    Log.w("FamilyRepo", "Skipping request from non-existent user: ${request.senderId}")
+                    null
+                } else {
+                    PendingRequest(
+                        id = request.id,
+                        senderId = request.senderId,
+                        senderName = senderName,
+                        timestamp = request.timestamp
+                    )
+                }
             }
+            Log.d("FriendRequestFlow", "RECEIVER: Found ${requestsWithNames.size} pending requests. Returning to ViewModel.")
+            return requestsWithNames
+        } catch (e: Exception) {
+            Log.e("FriendRequestFlow", "RECEIVER: Error manually fetching pending requests.", e)
+            return emptyList()
         }
+    }
 
-        // Fetch the initial data as soon as we start listening.
-        fetchAndSend()
-
-        val channel = supabaseClient.channel("friendship-requests")
-        val changeJob = launch {
-            channel.postgresChangeFlow<PostgresAction>(schema = "public") {
-                table = "friendship_requests"
-                filter = "receiver_id=eq.$currentUserId"
-            }.collect {
-                Log.d("FriendRequestFlow", "RECEIVER: Detected a database change. Refetching requests.")
-                fetchAndSend()
-            }
-        }
-
-        launch {
-            Log.d("FriendRequestFlow", "RECEIVER: Subscribing to realtime channel...")
-            channel.subscribe()
-        }
-
-        awaitClose {
-            Log.d("FriendRequestFlow", "RECEIVER: Closing listener for user $currentUserId.")
-            changeJob.cancel()
-            launch { channel.unsubscribe() }
+    override suspend fun searchUsers(query: String): List<FamilyMember> {
+        return try {
+            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
+            supabaseClient.from("users")
+                .select {
+                    filter {
+                        ilike("name", "%$query%")
+                        neq("user_id", currentUserId)
+                    }
+                }
+                .decodeList<FamilyMemberSupabase>()
+                .map { FamilyMember(it.name, it.status ?: "", it.userId) }
+        } catch (e: Exception) {
+            Log.e("FamilyRepository", "searchUsers failed", e)
+            emptyList()
         }
     }
 }
-
-// Data class for Supabase mapping (pas aan naar jouw kolommen)
-data class FamilyMemberSupabase(
-    val name: String,
-    val status: String? = null
-) 
