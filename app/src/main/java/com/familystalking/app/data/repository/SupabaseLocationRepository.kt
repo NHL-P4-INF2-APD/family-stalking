@@ -70,7 +70,7 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun getUserLocation(userId: UUID): Location? {
         return supabaseClient.postgrest["locations"]
-            .select(Columns.list("*")) { // Or simply .select { for all columns
+            .select(Columns.list("*")) {
                 filter { eq("user_id", userId.toString()) }
                 order("timestamp", Order.DESCENDING)
                 limit(1)

@@ -1,23 +1,46 @@
 package com.familystalking.app.data.repository
 
+import android.util.Log
 import com.familystalking.app.domain.model.AuthError
 import com.familystalking.app.domain.model.AuthResult
 import com.familystalking.app.domain.model.SessionState
 import com.familystalking.app.domain.repository.AuthenticationRepository
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class AuthenticationRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient
 ) : AuthenticationRepository {
 
-    private val _sessionState = MutableStateFlow<SessionState>(SessionState.Loading)
-    override val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override val sessionState: StateFlow<SessionState> = supabaseClient.auth.sessionStatus
+        .map { status ->
+            Log.d("AuthRepoImpl", "Supabase SessionStatus changed: $status")
+            when (status) {
+                is SessionStatus.Authenticated -> SessionState.Authenticated
+                is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
+                is SessionStatus.LoadingFromStorage -> SessionState.Loading
+                is SessionStatus.NetworkError -> SessionState.Unauthenticated
+            }
+        }
+        .stateIn(
+            scope = repositoryScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = SessionState.Loading
+        )
 
     override suspend fun signIn(email: String, password: String): AuthResult {
         return try {
@@ -25,11 +48,9 @@ class AuthenticationRepositoryImpl @Inject constructor(
                 this.email = email
                 this.password = password
             }
-            _sessionState.value = SessionState.Authenticated
             AuthResult.Success
         } catch (e: Exception) {
-            e.printStackTrace() // Add logging for debugging
-            _sessionState.value = SessionState.Unauthenticated
+            Log.e("AuthRepoImpl", "signIn failed", e)
             AuthResult.Error(AuthError.InvalidCredentials)
         }
     }
@@ -40,20 +61,18 @@ class AuthenticationRepositoryImpl @Inject constructor(
                 this.email = email
                 this.password = password
             }
-            
-            // Check if signup was successful and user is confirmed
-            if (response?.id != "") {
-                _sessionState.value = SessionState.Authenticated
+            if (response?.id != null) {
+                Log.i("AuthRepoImpl", "signUp successful for $email, user ID: ${response.id}")
                 AuthResult.Success
             } else {
-                _sessionState.value = SessionState.Unauthenticated
+                Log.w("AuthRepoImpl", "signUp returned null or no ID for $email")
                 AuthResult.Error(AuthError.UnknownError)
             }
         } catch (e: Exception) {
-            e.printStackTrace() // Add logging for debugging
-            _sessionState.value = SessionState.Unauthenticated
+            Log.e("AuthRepoImpl", "signUp failed", e)
             when {
-                e.message?.contains("already", ignoreCase = true) == true -> {
+                e.message?.contains("User already registered", ignoreCase = true) == true ||
+                        e.message?.contains("already_exists", ignoreCase = true) == true -> {
                     AuthResult.Error(AuthError.EmailAlreadyInUse)
                 }
                 else -> AuthResult.Error(AuthError.UnknownError)
@@ -66,7 +85,7 @@ class AuthenticationRepositoryImpl @Inject constructor(
             supabaseClient.auth.resetPasswordForEmail(email)
             AuthResult.Success
         } catch (e: Exception) {
-            e.printStackTrace() // Add logging for debugging
+            Log.e("AuthRepoImpl", "resetPassword failed", e)
             AuthResult.Error(AuthError.InvalidEmail)
         }
     }
@@ -74,25 +93,29 @@ class AuthenticationRepositoryImpl @Inject constructor(
     override suspend fun signOut(): AuthResult {
         return try {
             supabaseClient.auth.signOut()
-            _sessionState.value = SessionState.Unauthenticated
             AuthResult.Success
         } catch (e: Exception) {
-            e.printStackTrace() // Add logging for debugging
+            Log.e("AuthRepoImpl", "signOut failed", e)
             AuthResult.Error(AuthError.UnknownError)
         }
     }
 
     override suspend fun checkSession() {
-        _sessionState.value = try {
-            val session = supabaseClient.auth.currentSessionOrNull()
-            if (session != null) {
-                SessionState.Authenticated
+        Log.d("AuthRepoImpl", "checkSession() called. Current Supabase session: ${supabaseClient.auth.currentSessionOrNull()}")
+    }
+
+    override suspend fun getCurrentUserId(): String? {
+        return try {
+            val userId = supabaseClient.auth.currentSessionOrNull()?.user?.id
+            if (userId != null) {
+                Log.d("AuthRepoImpl", "Current User ID: $userId")
             } else {
-                SessionState.Unauthenticated
+                Log.w("AuthRepoImpl", "Current User ID is null (no active session or user info).")
             }
+            userId
         } catch (e: Exception) {
-            e.printStackTrace() // Add logging for debugging
-            SessionState.Unauthenticated
+            Log.e("AuthRepoImpl", "Error getting current user ID", e)
+            null
         }
     }
-} 
+}

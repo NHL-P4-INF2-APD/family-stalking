@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// Top-level property for the DataStore instance
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_settings_preferences") // Changed name slightly for clarity
+
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_settings_preferences")
 
 @Singleton
 class SettingsDataStore @Inject constructor(private val context: Context) {
@@ -20,12 +20,12 @@ class SettingsDataStore @Inject constructor(private val context: Context) {
     private object PreferencesKeys {
         val LOCATION_SHARING_PREFERENCE = booleanPreferencesKey("location_sharing_preference")
         val PUSH_NOTIFICATIONS = booleanPreferencesKey("push_notifications")
-        val SHOW_BATTERY_PERCENTAGE = booleanPreferencesKey("show_battery_percentage_on_map") // Made key more specific
+        val SHOW_BATTERY_PERCENTAGE = booleanPreferencesKey("show_battery_percentage_on_map")
     }
 
     val locationSharingPreference: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[PreferencesKeys.LOCATION_SHARING_PREFERENCE] ?: true // Default
+            preferences[PreferencesKeys.LOCATION_SHARING_PREFERENCE] ?: true
         }
 
     suspend fun saveLocationSharingPreference(isEnabled: Boolean) {
@@ -36,7 +36,7 @@ class SettingsDataStore @Inject constructor(private val context: Context) {
 
     val pushNotificationsPreference: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[PreferencesKeys.PUSH_NOTIFICATIONS] ?: false // Default
+            preferences[PreferencesKeys.PUSH_NOTIFICATIONS] ?: false
         }
 
     suspend fun savePushNotificationsPreference(isEnabled: Boolean) {
@@ -45,10 +45,9 @@ class SettingsDataStore @Inject constructor(private val context: Context) {
         }
     }
 
-    // This is the flow your MapViewModel will observe
     val showBatteryPercentagePreference: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
-            preferences[PreferencesKeys.SHOW_BATTERY_PERCENTAGE] ?: true // Default: show battery
+            preferences[PreferencesKeys.SHOW_BATTERY_PERCENTAGE] ?: true
         }
 
     suspend fun saveShowBatteryPercentagePreference(isEnabled: Boolean) {

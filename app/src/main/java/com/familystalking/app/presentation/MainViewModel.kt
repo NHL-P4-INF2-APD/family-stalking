@@ -5,20 +5,25 @@ import androidx.lifecycle.viewModelScope
 import com.familystalking.app.domain.model.SessionState
 import com.familystalking.app.domain.repository.AuthenticationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import android.util.Log
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val authenticationRepository: AuthenticationRepository
+    authenticationRepository: AuthenticationRepository
 ) : ViewModel() {
 
     val sessionState: StateFlow<SessionState> = authenticationRepository.sessionState
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = SessionState.Loading
+        )
 
-    fun checkSession() {
-        viewModelScope.launch {
-            authenticationRepository.checkSession()
-        }
+    init {
+        Log.d("MainViewModel", "MainViewModel initialized. Session state will be collected from repository.")
     }
-} 
+}
