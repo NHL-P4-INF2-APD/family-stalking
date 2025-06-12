@@ -1,24 +1,46 @@
 package com.familystalking.app.data.repository
 
 import android.util.Log
-import com.familystalking.app.domain.model.AuthError // Ensure this import is correct for your project
-import com.familystalking.app.domain.model.AuthResult // Ensure this import is correct for your project
-import com.familystalking.app.domain.model.SessionState // Ensure this import is correct for your project
-import com.familystalking.app.domain.repository.AuthenticationRepository // Import from DOMAIN
+import com.familystalking.app.domain.model.AuthError
+import com.familystalking.app.domain.model.AuthResult
+import com.familystalking.app.domain.model.SessionState
+import com.familystalking.app.domain.repository.AuthenticationRepository
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class AuthenticationRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient
 ) : AuthenticationRepository {
 
-    private val _sessionState = MutableStateFlow<SessionState>(SessionState.Loading)
-    override val sessionState: StateFlow<SessionState> = _sessionState.asStateFlow()
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override val sessionState: StateFlow<SessionState> = supabaseClient.auth.sessionStatus
+        .map { status ->
+            Log.d("AuthRepoImpl", "Supabase SessionStatus changed: $status")
+            when (status) {
+                is SessionStatus.Authenticated -> SessionState.Authenticated
+                is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
+                is SessionStatus.LoadingFromStorage -> SessionState.Loading
+                is SessionStatus.NetworkError -> SessionState.Unauthenticated // Or a new Error state
+            }
+        }
+        .stateIn(
+            scope = repositoryScope,
+            started = SharingStarted.WhileSubscribed(5000L),
+            initialValue = SessionState.Loading
+        )
 
     override suspend fun signIn(email: String, password: String): AuthResult {
         return try {
@@ -26,11 +48,9 @@ class AuthenticationRepositoryImpl @Inject constructor(
                 this.email = email
                 this.password = password
             }
-            _sessionState.value = SessionState.Authenticated
             AuthResult.Success
         } catch (e: Exception) {
             Log.e("AuthRepoImpl", "signIn failed", e)
-            _sessionState.value = SessionState.Unauthenticated
             AuthResult.Error(AuthError.InvalidCredentials)
         }
     }
@@ -46,12 +66,10 @@ class AuthenticationRepositoryImpl @Inject constructor(
                 AuthResult.Success
             } else {
                 Log.w("AuthRepoImpl", "signUp returned null or no ID for $email")
-                _sessionState.value = SessionState.Unauthenticated
                 AuthResult.Error(AuthError.UnknownError)
             }
         } catch (e: Exception) {
             Log.e("AuthRepoImpl", "signUp failed", e)
-            _sessionState.value = SessionState.Unauthenticated
             when {
                 e.message?.contains("User already registered", ignoreCase = true) == true ||
                         e.message?.contains("already_exists", ignoreCase = true) == true -> {
@@ -75,7 +93,6 @@ class AuthenticationRepositoryImpl @Inject constructor(
     override suspend fun signOut(): AuthResult {
         return try {
             supabaseClient.auth.signOut()
-            _sessionState.value = SessionState.Unauthenticated
             AuthResult.Success
         } catch (e: Exception) {
             Log.e("AuthRepoImpl", "signOut failed", e)
@@ -84,19 +101,7 @@ class AuthenticationRepositoryImpl @Inject constructor(
     }
 
     override suspend fun checkSession() {
-        _sessionState.value = try {
-            val session = supabaseClient.auth.currentSessionOrNull()
-            if (session != null) {
-                Log.d("AuthRepoImpl", "Session active for user: ${session.user?.id}")
-                SessionState.Authenticated
-            } else {
-                Log.d("AuthRepoImpl", "No active session.")
-                SessionState.Unauthenticated
-            }
-        } catch (e: Exception) {
-            Log.e("AuthRepoImpl", "checkSession failed", e)
-            SessionState.Unauthenticated
-        }
+        Log.d("AuthRepoImpl", "checkSession() called. Current Supabase session: ${supabaseClient.auth.currentSessionOrNull()}")
     }
 
     override suspend fun getCurrentUserId(): String? {
