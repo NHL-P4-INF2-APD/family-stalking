@@ -1,4 +1,4 @@
-package com.familystalking.app.data.repository // Or your domain.repository if interface is there
+package com.familystalking.app.data.repository
 
 import android.util.Log
 import com.familystalking.app.data.model.Profile
@@ -14,13 +14,11 @@ import kotlinx.serialization.json.put // For building JSON update payload
 import javax.inject.Inject
 import javax.inject.Singleton
 
-// --- INTERFACE DEFINITION ---
 interface ProfileRepository {
     suspend fun getUserProfile(userId: String): Profile?
-    suspend fun updateUsername(userId: String, newUsername: String): Boolean // <<< NEW METHOD
+    suspend fun updateUsername(userId: String, newUsername: String): Boolean
 }
 
-// --- IMPLEMENTATION CLASS ---
 @Singleton
 class ProfileRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient
@@ -31,7 +29,6 @@ class ProfileRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getUserProfile(userId: String): Profile? {
-        // ... (existing getUserProfile implementation) ...
         return try {
             withContext(Dispatchers.IO) {
                 Log.d("ProfileRepositoryImpl", "Attempting to fetch and decode profile for user ID: $userId")
@@ -67,13 +64,10 @@ class ProfileRepositoryImpl @Inject constructor(
         }
     }
 
-    // --- NEW METHOD IMPLEMENTATION ---
     override suspend fun updateUsername(userId: String, newUsername: String): Boolean {
         return try {
             withContext(Dispatchers.IO) {
                 Log.d("ProfileRepositoryImpl", "Attempting to update username for user ID $userId to '$newUsername'")
-                // Create the JSON object for the update
-                // Only update the 'username' field
                 val updateData = buildJsonObject {
                     put("username", newUsername)
                 }
@@ -81,12 +75,9 @@ class ProfileRepositoryImpl @Inject constructor(
                 supabaseClient.postgrest[TABLE_PROFILES]
                     .update(updateData) {
                         filter {
-                            eq("id", userId) // Ensure we only update the specific user's profile
+                            eq("id", userId)
                         }
                     }
-                // If the update call doesn't throw an exception, assume success for now.
-                // Supabase client might not return a detailed success body for updates by default.
-                // You could add .execute() and check response status if needed, but often lack of exception is enough.
                 Log.i("ProfileRepositoryImpl", "Username update request sent for user ID $userId.")
                 true // Indicate success
             }

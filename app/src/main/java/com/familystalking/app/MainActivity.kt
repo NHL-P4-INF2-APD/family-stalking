@@ -49,9 +49,9 @@ class MainActivity : ComponentActivity() {
             FamilyStalkingTheme {
                 val navController = rememberNavController()
                 val mainViewModel: MainViewModel = hiltViewModel()
-                val familyViewModel: FamilyViewModel = hiltViewModel() // Assuming this is needed globally
+                val familyViewModel: FamilyViewModel = hiltViewModel()
                 val sessionState by mainViewModel.sessionState.collectAsState()
-                val familyState by familyViewModel.state.collectAsState() // Assuming this is for family features
+                val familyState by familyViewModel.state.collectAsState()
                 val snackbarHostState = remember { SnackbarHostState() }
 
                 var determinedStartDestination by remember { mutableStateOf<String?>(null) }
@@ -143,7 +143,7 @@ fun AppNavHost(
 
     NavHost(
         navController = navController,
-        startDestination = startDestination, // This now correctly sets the initial screen
+        startDestination = startDestination,
         modifier = Modifier.fillMaxSize()
     ) {
         composable(Screen.Login.route) { LoginScreen(navController) }

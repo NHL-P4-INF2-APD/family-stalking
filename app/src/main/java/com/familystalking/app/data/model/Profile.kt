@@ -1,13 +1,13 @@
-package com.familystalking.app.data.model // Ensure this package matches its location
+package com.familystalking.app.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-@Serializable // Necessary for Kotlinx Serialization to work with Supabase client
+@Serializable
 data class Profile(
-    @SerialName("id") // This tells the serializer that the JSON key "id" maps to this field
-    val id: String,   // Matches the 'uuid' type in Supabase, treated as String in Kotlin
+    @SerialName("id")
+    val id: String,
 
-    @SerialName("username") // This tells the serializer that the JSON key "username" maps to this field
-    val username: String? = null // Matches the 'text' type in Supabase, nullable because it can be NULL
+    @SerialName("username")
+    val username: String? = null
 )

@@ -33,7 +33,7 @@ class AuthenticationRepositoryImpl @Inject constructor(
                 is SessionStatus.Authenticated -> SessionState.Authenticated
                 is SessionStatus.NotAuthenticated -> SessionState.Unauthenticated
                 is SessionStatus.LoadingFromStorage -> SessionState.Loading
-                is SessionStatus.NetworkError -> SessionState.Unauthenticated // Or a new Error state
+                is SessionStatus.NetworkError -> SessionState.Unauthenticated
             }
         }
         .stateIn(
