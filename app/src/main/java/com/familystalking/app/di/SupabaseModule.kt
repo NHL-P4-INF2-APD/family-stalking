@@ -1,8 +1,7 @@
 package com.familystalking.app.di
 
 import com.familystalking.app.BuildConfig
-import com.familystalking.app.data.repository.AuthenticationRepositoryImpl
-import com.familystalking.app.domain.repository.AuthenticationRepository
+// Remove unused imports for repositories from here if they were only for the @Provides methods
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -27,18 +26,11 @@ object SupabaseModule {
         install(Auth)
         install(Postgrest)
         install(Realtime)
+        // If you used KotlinXSerializer or a specific Ktor engine, add them back
+        // defaultSerializer = KotlinXSerializer()
+        // httpClientEngine = OkHttp.create() // Or your preferred engine
     }
 
-    @Provides
-    @Singleton
-    fun provideAuthenticationRepository(
-        supabaseClient: SupabaseClient
-    ): AuthenticationRepository = AuthenticationRepositoryImpl(supabaseClient)
-
-    @Provides
-    @Singleton
-    fun provideFamilyRepository(
-        supabaseClient: SupabaseClient
-    ): com.familystalking.app.domain.repository.FamilyRepository =
-        com.familystalking.app.data.repository.FamilyRepositoryImpl(supabaseClient)
-} 
+    // NO @Provides for AuthenticationRepository here
+    // NO @Provides for FamilyRepository here
+}

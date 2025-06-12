@@ -18,11 +18,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -31,6 +34,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,9 +49,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.familystalking.app.presentation.navigation.BottomNavBar
-import com.familystalking.app.presentation.navigation.Screen // Ensure this import is correct
+import com.familystalking.app.presentation.navigation.Screen
 
-// Constants
 private val BACKGROUND_COLOR = Color(0xFFF5F5F5)
 private val CARD_CORNER_RADIUS = 8.dp
 private val SETTINGS_CARD_VERTICAL_PADDING = 8.dp
@@ -57,12 +62,10 @@ private val SECTION_TITLE_FONT_SIZE = 14.sp
 private const val SWITCH_SCALE = 0.75f
 private val DIVIDER_COLOR = Color(0xFFEEEEEE)
 private val SIGN_OUT_COLOR = Color.Red
-private val SIGN_OUT_INDICATOR_COLOR = Color.White
 private val SWITCH_CHECKED_TRACK_COLOR: Color @Composable get() = MaterialTheme.colorScheme.primary
 private val SWITCH_UNCHECKED_TRACK_COLOR = Color.Gray.copy(alpha = 0.5f)
 private val SWITCH_DISABLED_CHECKED_TRACK_COLOR: Color @Composable get() = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
 private val SWITCH_DISABLED_UNCHECKED_TRACK_COLOR = Color.Gray.copy(alpha = 0.3f)
-
 
 @Composable
 fun SettingsScreen(
@@ -70,8 +73,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val isLoading by viewModel.isLoading.collectAsState()
+    val isLoadingSignOut by viewModel.isLoading.collectAsState()
     val userName by viewModel.userName.collectAsState()
+    val isUpdatingUserName by viewModel.isUpdatingUserName.collectAsState()
 
     val userLocationSharingPreference by viewModel.locationSharingPreference.collectAsState()
     val isDeviceLocationEnabled by viewModel.isDeviceLocationEnabled.collectAsState()
@@ -79,11 +83,25 @@ fun SettingsScreen(
     val pushNotifications by viewModel.pushNotifications.collectAsState()
     val showBatteryPercentage by viewModel.showBatteryPercentage.collectAsState()
 
+    var showEditUsernameDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val gpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
         val networkEnabled = locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
         viewModel.updateDeviceLocationStatus(gpsEnabled || networkEnabled)
+    }
+
+    if (showEditUsernameDialog) {
+        EditUsernameDialog(
+            currentUsername = userName,
+            isUpdating = isUpdatingUserName,
+            onDismiss = { showEditUsernameDialog = false },
+            onConfirm = { newUsername ->
+                viewModel.updateUsername(newUsername)
+                showEditUsernameDialog = false
+            }
+        )
     }
 
     Column(
@@ -98,8 +116,10 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(CARD_PADDING)
         ) {
-            UserProfileCard(userName = userName)
-
+            UserProfileCard(
+                userName = userName,
+                onEditUsernameClick = { showEditUsernameDialog = true }
+            )
             SettingsCard(
                 isDeviceLocationEnabled = isDeviceLocationEnabled,
                 userLocationSharingPreference = userLocationSharingPreference,
@@ -112,11 +132,10 @@ fun SettingsScreen(
                     context.startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                 }
             )
-
             SignOutCard(
-                isLoading = isLoading,
+                isLoading = isLoadingSignOut,
                 onSignOut = {
-                    if (!isLoading) {
+                    if (!isLoadingSignOut) {
                         viewModel.signOut()
                     }
                 }
@@ -130,7 +149,10 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun UserProfileCard(userName: String) {
+private fun UserProfileCard(
+    userName: String,
+    onEditUsernameClick: () -> Unit
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -162,6 +184,7 @@ private fun UserProfileCard(userName: String) {
                 modifier = Modifier
                     .padding(start = CARD_PADDING)
                     .weight(1f)
+                    .clickable(onClick = onEditUsernameClick)
             ) {
                 Text(
                     text = userName,
@@ -171,11 +194,80 @@ private fun UserProfileCard(userName: String) {
                 Text(
                     text = "Edit your name",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
+}
+
+@Composable
+fun EditUsernameDialog(
+    currentUsername: String,
+    isUpdating: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var newUsernameText by remember(currentUsername) { mutableStateOf(currentUsername) }
+    var showError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!isUpdating) onDismiss() },
+        title = { Text("Edit Username") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = newUsernameText,
+                    onValueChange = {
+                        newUsernameText = it
+                        if (it.isNotBlank()) showError = false
+                    },
+                    label = { Text("New username") },
+                    singleLine = true,
+                    isError = showError,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (showError) {
+                    Text(
+                        "Username cannot be empty.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (newUsernameText.isNotBlank()) {
+                        onConfirm(newUsernameText)
+                    } else {
+                        showError = true
+                    }
+                },
+                enabled = !isUpdating
+            ) {
+                if (isUpdating) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Save")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isUpdating
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -209,7 +301,6 @@ private fun SettingsCard(
                 onUserPreferenceChange = onLocationSharingPreferenceChange,
                 onEnableDeviceLocationClicked = onEnableDeviceLocationClicked
             )
-
             SettingsDivider()
             SectionTitle("Notifications")
             SettingsToggleItem(
@@ -217,7 +308,6 @@ private fun SettingsCard(
                 checked = pushNotifications,
                 onCheckedChange = onPushNotificationsChange
             )
-
             SettingsDivider()
             SectionTitle("Map settings")
             SettingsToggleItem(
@@ -259,7 +349,7 @@ private fun LocationSharingSettingItem(
             Text(
                 text = "Location sharing",
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isDeviceLocationEnabled) MaterialTheme.colorScheme.onSurfaceVariant else Color.Gray,
+                color = if (isDeviceLocationEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                 fontSize = SECTION_TITLE_FONT_SIZE,
                 modifier = Modifier.weight(1f)
             )
@@ -272,9 +362,9 @@ private fun LocationSharingSettingItem(
                 },
                 enabled = isDeviceLocationEnabled,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = SIGN_OUT_INDICATOR_COLOR,
+                    checkedThumbColor = Color.White,
                     checkedTrackColor = SWITCH_CHECKED_TRACK_COLOR,
-                    uncheckedThumbColor = SIGN_OUT_INDICATOR_COLOR,
+                    uncheckedThumbColor = Color.White,
                     uncheckedTrackColor = SWITCH_UNCHECKED_TRACK_COLOR,
                     disabledCheckedTrackColor = SWITCH_DISABLED_CHECKED_TRACK_COLOR,
                     disabledUncheckedTrackColor = SWITCH_DISABLED_UNCHECKED_TRACK_COLOR
@@ -293,7 +383,7 @@ private fun LocationSharingSettingItem(
                 Text(
                     text = "Device location is off.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     modifier = Modifier.weight(1f)
                 )
                 TextButton(onClick = onEnableDeviceLocationClicked) {
@@ -321,7 +411,7 @@ private fun SettingsToggleItem(
         Text(
             text = title,
             style = MaterialTheme.typography.bodyMedium,
-            color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else Color.Gray,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
             fontSize = SECTION_TITLE_FONT_SIZE,
             modifier = Modifier.weight(1f)
         )
@@ -330,9 +420,9 @@ private fun SettingsToggleItem(
             onCheckedChange = { onCheckedChange() },
             enabled = enabled,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = SIGN_OUT_INDICATOR_COLOR,
+                checkedThumbColor = Color.White,
                 checkedTrackColor = SWITCH_CHECKED_TRACK_COLOR,
-                uncheckedThumbColor = SIGN_OUT_INDICATOR_COLOR,
+                uncheckedThumbColor = Color.White,
                 uncheckedTrackColor = SWITCH_UNCHECKED_TRACK_COLOR,
                 disabledCheckedTrackColor = SWITCH_DISABLED_CHECKED_TRACK_COLOR,
                 disabledUncheckedTrackColor = SWITCH_DISABLED_UNCHECKED_TRACK_COLOR
