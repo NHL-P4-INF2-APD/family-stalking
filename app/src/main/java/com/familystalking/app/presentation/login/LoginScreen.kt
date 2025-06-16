@@ -41,6 +41,7 @@ import androidx.navigation.NavController
 import com.familystalking.app.R
 import com.familystalking.app.domain.model.AuthError
 import com.familystalking.app.presentation.navigation.Screen
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,8 +57,15 @@ fun LoginScreen(
 
     LaunchedEffect(navigateTo) {
         navigateTo?.let { route ->
-            navController.navigate(route) {
-                popUpTo(Screen.Login.route)
+            Log.d("LoginScreen", "NavigateTo triggered: $route")
+            if (route == Screen.Map.route || route == Screen.Home.route) { // Assuming Map or Home is after login
+                navController.navigate(route) {
+                    popUpTo(Screen.Login.route) { inclusive = true }
+                }
+            } else {
+                // For other navigations managed by viewModel (if any),
+                // consider if popUpTo(Screen.Login.route) is appropriate
+                // For now, let's assume this block is mainly for post-login
             }
             viewModel.onNavigated()
         }
@@ -71,7 +79,7 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Top
     ) {
         Spacer(modifier = Modifier.height(64.dp))
-        
+
         Surface(
             modifier = Modifier
                 .size(120.dp)
@@ -151,7 +159,10 @@ fun LoginScreen(
         )
 
         TextButton(
-            onClick = { navController.navigate(Screen.ForgotPassword.route) },
+            onClick = {
+                Log.d("LoginScreen", "Forgot password clicked")
+                navController.navigate(Screen.ForgotPassword.route)
+            },
             modifier = Modifier.align(Alignment.End)
         ) {
             Text(
@@ -191,7 +202,10 @@ fun LoginScreen(
                 text = "Don't have an account?",
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(onClick = { navController.navigate(Screen.Signup.route) }) {
+            TextButton(onClick = {
+                Log.d("LoginScreen", "Sign up clicked")
+                navController.navigate(Screen.Signup.route)
+            }) {
                 Text(
                     text = "Sign up",
                     color = MaterialTheme.colorScheme.primary
@@ -199,4 +213,4 @@ fun LoginScreen(
             }
         }
     }
-} 
+}

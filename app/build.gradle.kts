@@ -76,6 +76,7 @@ android {
 }
 
 dependencies {
+    implementation("com.google.ar:core:1.49.0")
     // Define versions in one place for better management
     val composeBomVersion = "2024.02.00"
     val hiltVersion = "2.50"
@@ -131,6 +132,8 @@ dependencies {
     implementation("io.ktor:ktor-client-android:2.3.8")
     implementation("io.ktor:ktor-client-core:2.3.8")
     implementation("io.ktor:ktor-client-cio:2.3.8") // Keep if it doesn't cause issues and Supabase might use it
+    implementation("io.ktor:ktor-client-okhttp:2.3.8") // Added OkHttp engine
+    implementation("io.ktor:ktor-client-logging:2.3.8") // Added Logging plugin
 
     // KotlinX Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")

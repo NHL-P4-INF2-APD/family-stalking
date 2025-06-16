@@ -7,19 +7,11 @@ import com.familystalking.app.domain.repository.FamilyRepository
 import com.familystalking.app.domain.repository.PendingRequest
 import com.familystalking.app.presentation.family.FamilyMember
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.exceptions.RestException
 import io.github.jan.supabase.gotrue.auth
-import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.realtime.PostgresAction
-import io.github.jan.supabase.realtime.Realtime
-import io.github.jan.supabase.realtime.channel
-import io.github.jan.supabase.realtime.postgresChangeFlow
-import io.github.jan.supabase.realtime.realtime
-import kotlinx.coroutines.channels.ProducerScope
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.launch
+import io.github.jan.supabase.postgrest.rpc // Import for RPC calls
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.Instant
@@ -27,31 +19,27 @@ import java.util.UUID
 import javax.inject.Inject
 
 @Serializable
-internal data class UserName(
-    val name: String
-)
-
-@Serializable
 internal data class FriendshipRequest(
     val id: String,
     @SerialName("sender_id") val senderId: String,
     @SerialName("receiver_id") val receiverId: String,
     val status: String,
-    val timestamp: String
+    @SerialName("timestamp") val timestampValue: String,
+    @SerialName("sender_name_snapshot") val senderNameSnapshot: String? = null
 )
 
 @Serializable
-internal data class Friend(
+internal data class Friend( // This data class is now less critical if inserts are via RPC
     @SerialName("user_id") val userId: String,
     @SerialName("friend_id") val friendId: String
 )
 
-// Data class for Supabase mapping (pas aan naar jouw kolommen)
 @Serializable
-data class FamilyMemberSupabase(
-    @SerialName("user_id") val userId: String,
-    val name: String,
-    val status: String? = null
+data class ProfileDataForRepository(
+    @SerialName("id") val id: String,
+    @SerialName("name") val name: String?,
+    @SerialName("username") val username: String?,
+    @SerialName("status") val status: String? = null
 )
 
 class FamilyRepositoryImpl @Inject constructor(
@@ -61,50 +49,66 @@ class FamilyRepositoryImpl @Inject constructor(
     override suspend fun getFamilyMembers(): List<FamilyMember> {
         return try {
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
-
-            // Step 1: Get the IDs of all friends from the 'friends' table
-            val friendIds = supabaseClient.from("friends").select {
+            val friendEntries = supabaseClient.postgrest["friends"].select {
                 filter { eq("user_id", currentUserId) }
-            }.decodeList<Friend>().map { it.friendId }
+            }.decodeList<Friend>()
 
-
+            val friendIds = friendEntries.map { it.friendId }
             if (friendIds.isEmpty()) return emptyList()
 
-            // Step 2: Get user details for the retrieved friend IDs from the 'users' table
-            val friends = supabaseClient.from("users").select {
-                filter { isIn("user_id", friendIds) }
-            }.decodeList<FamilyMemberSupabase>()
+            val friendsProfileData = supabaseClient.postgrest["profiles"].select {
+                filter { isIn("id", friendIds) }
+            }.decodeList<ProfileDataForRepository>()
 
-            friends.map { FamilyMember(it.name, it.status ?: "", it.userId) }
+            friendsProfileData.map { profile ->
+                FamilyMember(
+                    id = profile.id,
+                    name = profile.name?.takeIf { it.isNotBlank() } ?: profile.username?.takeIf {it.isNotBlank()} ?: "Unknown User",
+                    status = profile.status ?: "Offline"
+                )
+            }
         } catch (e: Exception) {
-            Log.e("FamilyRepository", "getFamilyMembers failed", e)
+            Log.e("FamilyRepositoryImpl", "[getFamilyMembers] Failed", e)
             emptyList()
         }
     }
 
     override suspend fun getCurrentUser(): FamilyMember {
-        return try {
+        val defaultNameFromEmail: (String?) -> String = { email ->
+            email?.substringBefore('@')?.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() } ?: "Unknown"
+        }
+        val defaultStatus = "Offline"
+        try {
             val authUser = supabaseClient.auth.currentUserOrNull()
             val userId = authUser?.id
             val userEmail = authUser?.email
-            val nameFromEmail = userEmail?.substringBefore('@')?.replaceFirstChar { it.uppercase() } ?: "Unknown"
-
             if (userId == null) {
-                return FamilyMember(id = null, name = nameFromEmail, status = "")
+                return FamilyMember(id = null, name = defaultNameFromEmail(userEmail), status = defaultStatus)
             }
-            
-            val response = supabaseClient.from("users").select { filter { eq("user_id", userId) } }.decodeList<FamilyMemberSupabase>()
-            val user = response.firstOrNull()
 
-            val finalName = if (user != null && user.name.isNotBlank()) user.name else nameFromEmail
-            val finalStatus = user?.status ?: ""
+            var profileData: ProfileDataForRepository? = null
+            try {
+                profileData = supabaseClient.postgrest["profiles"]
+                    .select(Columns.list("id, name, username, status")) {
+                        filter { eq("id", userId) }
+                    }
+                    .decodeSingleOrNull<ProfileDataForRepository>()
+            } catch(re: RestException) {
+                Log.e("FamilyRepositoryImpl", "[getCurrentUser] RestException fetching profile for $userId: ${re.message}", re)
+            } catch (e: Exception) {
+                Log.e("FamilyRepositoryImpl", "[getCurrentUser] Generic Exception fetching profile for $userId: ${e.message}", e)
+            }
 
-            FamilyMember(id = userId, name = finalName, status = finalStatus)
+            val finalName = profileData?.name?.takeIf { it.isNotBlank() }
+                ?: profileData?.username?.takeIf { it.isNotBlank() }
+                ?: defaultNameFromEmail(userEmail)
+            val finalStatus = profileData?.status?.takeIf { it.isNotBlank() } ?: defaultStatus
+
+            return FamilyMember(id = userId, name = finalName, status = finalStatus)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("FamilyRepositoryImpl", "[getCurrentUser] Outer catch block exception: ${e.message}", e)
             val userEmail = supabaseClient.auth.currentUserOrNull()?.email
-            val nameFromEmail = userEmail?.substringBefore('@')?.replaceFirstChar { it.uppercase() } ?: "Unknown"
-            FamilyMember(id = null, name = nameFromEmail, status = "")
+            return FamilyMember(id = null, name = defaultNameFromEmail(userEmail), status = defaultStatus)
         }
     }
 
@@ -116,100 +120,139 @@ class FamilyRepositoryImpl @Inject constructor(
     override suspend fun sendFriendshipRequest(receiverId: String): Result<Unit> {
         val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
             ?: return Result.failure(Exception("SENDER: User not authenticated"))
-        Log.d("FriendRequestFlow", "SENDER: Attempting to send request from $currentUserId to $receiverId")
 
         return try {
             if (currentUserId == receiverId) {
-                return Result.failure(Exception("You cannot add yourself as a friend."))
+                return Result.failure(IllegalArgumentException("You cannot add yourself as a friend."))
             }
 
-            val existingRequests = supabaseClient.from("friendship_requests").select {
+            val existingRequests = supabaseClient.postgrest["friendship_requests"].select {
                 filter {
                     or {
-                        and {
-                            eq("sender_id", currentUserId)
-                            eq("receiver_id", receiverId)
-                        }
-                        and {
-                            eq("sender_id", receiverId)
-                            eq("receiver_id", currentUserId)
-                        }
+                        and { eq("sender_id", currentUserId); eq("receiver_id", receiverId) }
+                        and { eq("sender_id", receiverId); eq("receiver_id", currentUserId) }
                     }
                 }
             }.decodeList<FriendshipRequest>()
-            Log.d("FriendRequestFlow", "SENDER: Found ${existingRequests.size} existing records between users.")
 
             if (existingRequests.any { it.status == "accepted" }) {
-                Log.w("FriendRequestFlow", "SENDER: Blocked. Users are already friends.")
-                return Result.failure(Exception("You are already friends with this user."))
+                return Result.failure(IllegalStateException("You are already friends with this user."))
+            }
+            if (existingRequests.any { it.status == "pending" && it.senderId == currentUserId && it.receiverId == receiverId }) {
+                return Result.failure(IllegalStateException("FRIEND_REQUEST_ALREADY_PENDING_SENT"))
+            }
+            if (existingRequests.any { it.status == "pending" && it.senderId == receiverId && it.receiverId == currentUserId }) {
+                return Result.failure(IllegalStateException("FRIEND_REQUEST_ALREADY_PENDING_RECEIVED"))
             }
 
-            if (existingRequests.any { it.status == "pending" }) {
-                Log.i("FriendRequestFlow", "SENDER: Silent success. Request already pending.")
-                return Result.success(Unit)
-            }
+            val senderProfile = supabaseClient.postgrest["profiles"]
+                .select(Columns.list("name, username")) { filter { eq("id", currentUserId) } }
+                .decodeSingleOrNull<ProfileDataForRepository>()
+            val senderNameSnapshot = senderProfile?.name?.takeIf { it.isNotBlank() } ?: senderProfile?.username?.takeIf { it.isNotBlank() } ?: "A User"
 
-            // Insert the new friend request
-            supabaseClient.from("friendship_requests").insert(
+            supabaseClient.postgrest["friendship_requests"].insert(
                 FriendshipRequest(
                     id = UUID.randomUUID().toString(),
                     senderId = currentUserId,
                     receiverId = receiverId,
                     status = "pending",
-                    timestamp = Instant.now().toString()
+                    timestampValue = Instant.now().toString(),
+                    senderNameSnapshot = senderNameSnapshot
                 )
             )
-            Log.d("FriendRequestFlow", "SENDER: Successfully inserted new friend request into database.")
+            Log.i("FamilyRepositoryImpl", "SENDER: Friendship request sent successfully from $currentUserId to $receiverId with sender name: $senderNameSnapshot")
             Result.success(Unit)
         } catch (e: Exception) {
-            Log.e("FriendRequestFlow", "SENDER: sendFriendshipRequest failed with exception.", e)
+            Log.e("FamilyRepositoryImpl", "SENDER: sendFriendshipRequest failed", e)
+            if (e.message?.contains("duplicate key value violates unique constraint") == true) {
+                return Result.failure(Exception("FRIEND_REQUEST_ALREADY_PENDING_SENT"))
+            }
             Result.failure(e)
         }
     }
 
-
     override suspend fun acceptFriendshipRequest(request: PendingRequest): Result<Unit> {
-        Log.d("FriendRequestFlow", "RECEIVER: Attempting to accept request ID: ${request.id}")
+        Log.d("FamilyRepositoryImpl", "[acceptFriendshipRequest] Attempting for request ID: ${request.id}, Sender: ${request.senderId}")
+
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+        if (currentUserId == null) {
+            Log.e("FamilyRepositoryImpl", "[acceptFriendshipRequest] Current user is not authenticated.")
+            return Result.failure(IllegalStateException("User not authenticated to accept request."))
+        }
+
         return try {
-            val fullRequest = supabaseClient.from("friendship_requests").select {
-                filter { eq("id", request.id) }
-            }.decodeSingle<FriendshipRequest>()
+            val fullRequest = supabaseClient.postgrest["friendship_requests"]
+                .select {
+                    filter {
+                        eq("id", request.id)
+                        eq("receiver_id", currentUserId)
+                        eq("status", "pending")
+                    }
+                }
+                .decodeSingleOrNull<FriendshipRequest>()
 
-            // Update request status to 'accepted'
-            supabaseClient.from("friendship_requests")
-                .update({ set("status", "accepted") }) { filter { eq("id", request.id) } }
-            
-            Log.d("FriendRequestFlow", "RECEIVER: Request status updated to 'accepted'.")
+            if (fullRequest == null) {
+                Log.w("FamilyRepositoryImpl", "[acceptFriendshipRequest] Request ID ${request.id} not found, not pending, or not for this user ($currentUserId).")
+                return Result.failure(NoSuchElementException("Friendship request not found or already processed."))
+            }
 
-            // Create the two-way friendship
-            val friendship1 = Friend(userId = fullRequest.senderId, friendId = fullRequest.receiverId)
-            val friendship2 = Friend(userId = fullRequest.receiverId, friendId = fullRequest.senderId)
-            
-            supabaseClient.from("friends").insert(friendship1)
-            supabaseClient.from("friends").insert(friendship2)
+            Log.d("FamilyRepositoryImpl", "[acceptFriendshipRequest] Found request to accept: $fullRequest")
 
-            Log.i("FriendRequestFlow", "RECEIVER: Friendship records created successfully.")
+            supabaseClient.postgrest["friendship_requests"]
+                .update( { set("status", "accepted") } ) {
+                    filter { eq("id", fullRequest.id) }
+                }
+
+            Log.d("FamilyRepositoryImpl", "[acceptFriendshipRequest] Request status updated to 'accepted' for ID: ${fullRequest.id}")
+
+            // Call the database function to create the two-way friendship
+            supabaseClient.postgrest.rpc(
+                function = "create_friendship",
+                parameters = mapOf(
+                    "user1_id" to fullRequest.senderId,
+                    "user2_id" to fullRequest.receiverId
+                )
+            )
+            Log.i("FamilyRepositoryImpl", "[acceptFriendshipRequest] Called create_friendship RPC for ${fullRequest.senderId} and ${fullRequest.receiverId}.")
             Result.success(Unit)
+        } catch (e: RestException) {
+            Log.e("FamilyRepositoryImpl", "[acceptFriendshipRequest] RestException for request ID: ${request.id}. Message: ${e.message}, Error: ${e.error}", e)
+            Result.failure(e)
         } catch (e: Exception) {
-            Log.e("FriendRequestFlow", "RECEIVER: acceptFriendshipRequest failed.", e)
+            Log.e("FamilyRepositoryImpl", "[acceptFriendshipRequest] Generic failed for request ID: ${request.id}", e)
             Result.failure(e)
         }
     }
 
     override suspend fun declineFriendshipRequest(request: PendingRequest): Result<Unit> {
+        Log.d("FamilyRepositoryImpl", "[declineFriendshipRequest] Attempting for request ID: ${request.id}")
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+        if (currentUserId == null) {
+            Log.e("FamilyRepositoryImpl", "[declineFriendshipRequest] Current user is not authenticated.")
+            return Result.failure(IllegalStateException("User not authenticated to decline request."))
+        }
+
         return try {
-            supabaseClient.from("friendship_requests")
-                .delete { filter { eq("id", request.id) } }
+            supabaseClient.postgrest["friendship_requests"]
+                .delete {
+                    filter {
+                        eq("id", request.id)
+                        eq("receiver_id", currentUserId)
+                        eq("status", "pending")
+                    }
+                }
+            Log.i("FamilyRepositoryImpl", "[declineFriendshipRequest] Delete request sent for ID: ${request.id}")
             Result.success(Unit)
         } catch (e: Exception) {
+            Log.e("FamilyRepositoryImpl", "[declineFriendshipRequest] Failed for request ID: ${request.id}", e)
             Result.failure(e)
         }
     }
 
     override suspend fun getPendingRequests(userId: String): List<PendingRequest> {
+        Log.d("FamilyRepositoryImpl", "[getPendingRequests] Attempting to fetch for receiver_id: $userId")
         try {
-            Log.d("FriendRequestFlow", "RECEIVER: Manually fetching pending requests for $userId...")
-            val requestsWithoutNames = supabaseClient.from("friendship_requests")
+            val requestsData = supabaseClient.postgrest["friendship_requests"]
                 .select {
                     filter {
                         eq("receiver_id", userId)
@@ -217,32 +260,23 @@ class FamilyRepositoryImpl @Inject constructor(
                     }
                 }.decodeList<FriendshipRequest>()
 
-            val requestsWithNames = requestsWithoutNames.mapNotNull { request ->
-                val senderName = try {
-                    supabaseClient.from("users")
-                        .select { filter { eq("user_id", request.senderId) } }
-                        .decodeSingleOrNull<FamilyMemberSupabase>()?.name
-                } catch (e: Exception) {
-                    Log.e("FamilyRepo", "Could not fetch sender name for ${request.senderId}", e)
-                    null
-                }
+            Log.d("FamilyRepositoryImpl", "[getPendingRequests] Raw requestsData count for receiver_id $userId (status 'pending'): ${requestsData.size}")
 
-                if (senderName == null) {
-                    Log.w("FamilyRepo", "Skipping request from non-existent user: ${request.senderId}")
-                    null
-                } else {
-                    PendingRequest(
-                        id = request.id,
-                        senderId = request.senderId,
-                        senderName = senderName,
-                        timestamp = request.timestamp
-                    )
-                }
+            return requestsData.mapNotNull { request ->
+                val senderNameToDisplay = request.senderNameSnapshot?.takeIf { it.isNotBlank() } ?: "Unknown Sender"
+                PendingRequest(
+                    id = request.id,
+                    senderId = request.senderId,
+                    senderName = senderNameToDisplay,
+                    timestamp = request.timestampValue
+                )
             }
-            Log.d("FriendRequestFlow", "RECEIVER: Found ${requestsWithNames.size} pending requests. Returning to ViewModel.")
-            return requestsWithNames
-        } catch (e: Exception) {
-            Log.e("FriendRequestFlow", "RECEIVER: Error manually fetching pending requests.", e)
+        } catch (e: RestException) {
+            Log.e("FamilyRepositoryImpl", "[getPendingRequests] RestException for $userId: ${e.message} Error: ${e.error}", e)
+            return emptyList()
+        }
+        catch (e: Exception) {
+            Log.e("FamilyRepositoryImpl", "[getPendingRequests] Generic error for $userId: ${e.message}", e)
             return emptyList()
         }
     }
@@ -250,17 +284,27 @@ class FamilyRepositoryImpl @Inject constructor(
     override suspend fun searchUsers(query: String): List<FamilyMember> {
         return try {
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
-            supabaseClient.from("users")
+            supabaseClient.postgrest["profiles"]
                 .select {
                     filter {
-                        ilike("name", "%$query%")
-                        neq("user_id", currentUserId)
+                        or {
+                            ilike("name", "%$query%")
+                            ilike("username", "%$query%")
+                        }
+                        neq("id", currentUserId)
                     }
+                    limit(10)
                 }
-                .decodeList<FamilyMemberSupabase>()
-                .map { FamilyMember(it.name, it.status ?: "", it.userId) }
+                .decodeList<ProfileDataForRepository>()
+                .map { profile ->
+                    FamilyMember(
+                        id = profile.id,
+                        name = profile.name?.takeIf { it.isNotBlank() } ?: profile.username?.takeIf { it.isNotBlank() } ?: "User",
+                        status = profile.status ?: "Offline"
+                    )
+                }
         } catch (e: Exception) {
-            Log.e("FamilyRepository", "searchUsers failed", e)
+            Log.e("FamilyRepositoryImpl", "searchUsers failed", e)
             emptyList()
         }
     }

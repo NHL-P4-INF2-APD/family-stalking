@@ -119,7 +119,6 @@ fun AppNavHost(
 
     var hasPerformedInitialNavigation by remember(startDestination) { mutableStateOf(false) }
 
-
     LaunchedEffect(Unit) {
         if (!hasPerformedInitialNavigation && startDestination.isNotEmpty()) {
             Log.d("AppNavHost", "Initial navigation to startDestination: $startDestination")
@@ -131,9 +130,14 @@ fun AppNavHost(
     }
 
     LaunchedEffect(sessionState, currentRoute, hasPerformedInitialNavigation) {
-        if (hasPerformedInitialNavigation) { // Only handle subsequent changes after initial nav
-            if (sessionState is SessionState.Unauthenticated && currentRoute != Screen.Login.route) {
-                Log.d("AppNavHost", "Session became Unauthenticated. Navigating to Login from $currentRoute.")
+        if (hasPerformedInitialNavigation) {
+            val isAuthenticatedScreen = currentRoute != Screen.Login.route &&
+                    currentRoute != Screen.Signup.route &&
+                    currentRoute != Screen.ForgotPassword.route
+            // Add any other non-authenticated routes here
+
+            if (sessionState is SessionState.Unauthenticated && isAuthenticatedScreen) {
+                Log.d("AppNavHost", "Session Unauthenticated while on an authenticated screen ($currentRoute). Navigating to Login.")
                 navController.navigate(Screen.Login.route) {
                     popUpTo(0) { inclusive = true }
                 }
