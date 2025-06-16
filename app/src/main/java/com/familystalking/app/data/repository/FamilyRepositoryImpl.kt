@@ -47,55 +47,30 @@ class FamilyRepositoryImpl @Inject constructor(
 ) : FamilyRepository {
 
     override suspend fun getFamilyMembers(): List<FamilyMember> {
-        Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Attempting to fetch family members.")
         return try {
-            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-            if (currentUserId == null) {
-                Log.w("FamilyRepositoryImpl", "[getFamilyMembers] Current user ID is null. Returning empty list.")
-                return emptyList()
-            }
-            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Current user ID: $currentUserId")
-
+            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
             val friendEntries = supabaseClient.postgrest["friends"].select {
                 filter { eq("user_id", currentUserId) }
             }.decodeList<Friend>()
 
-            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Found ${friendEntries.size} friend entries for $currentUserId: $friendEntries")
-
             val friendIds = friendEntries.map { it.friendId }
-            if (friendIds.isEmpty()) {
-                Log.d("FamilyRepositoryImpl", "[getFamilyMembers] friendIds list is empty, no friends to fetch details for.")
-                return emptyList()
-            }
-            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Friend IDs to fetch profiles for: $friendIds")
+            if (friendIds.isEmpty()) return emptyList()
 
             val friendsProfileData = supabaseClient.postgrest["profiles"].select(
-                Columns.list("id, name, username, status") // Explicitly select needed columns
+                Columns.list("id, name, username, status")
             ) {
                 filter { isIn("id", friendIds) }
             }.decodeList<ProfileDataForRepository>()
-
-            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Fetched ${friendsProfileData.size} profiles for friend IDs.")
-            if (friendsProfileData.isNotEmpty()) {
-                friendsProfileData.forEachIndexed { index, profile ->
-                    Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Profile for friend [${index}]: $profile")
-                }
-            }
-
 
             friendsProfileData.map { profile ->
                 FamilyMember(
                     id = profile.id,
                     name = profile.name?.takeIf { it.isNotBlank() } ?: profile.username?.takeIf {it.isNotBlank()} ?: "Unknown User",
-                    status = profile.status?.takeIf { it.isNotBlank() } ?: "Offline"
+                    status = profile.status ?: "Offline"
                 )
             }
-        } catch (e: RestException) {
-            Log.e("FamilyRepositoryImpl", "[getFamilyMembers] RestException: ${e.message} Error: ${e.error}", e)
-            emptyList()
-        }
-        catch (e: Exception) {
-            Log.e("FamilyRepositoryImpl", "[getFamilyMembers] Generic failed with exception", e)
+        } catch (e: Exception) {
+            Log.e("FamilyRepositoryImpl", "[getFamilyMembers] Failed", e)
             emptyList()
         }
     }
@@ -139,9 +114,18 @@ class FamilyRepositoryImpl @Inject constructor(
         }
     }
 
+    // --- ADDED THIS MISSING IMPLEMENTATION ---
     override suspend fun getCurrentUserId(): String? {
-        return supabaseClient.auth.currentUserOrNull()?.id
+        return try {
+            val userId = supabaseClient.auth.currentUserOrNull()?.id
+            Log.d("FamilyRepositoryImpl", "[getCurrentUserId] User ID from auth: $userId")
+            userId
+        } catch (e: Exception) {
+            Log.e("FamilyRepositoryImpl", "[getCurrentUserId] Error fetching user ID", e)
+            null
+        }
     }
+    // --- END OF ADDED IMPLEMENTATION ---
 
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun sendFriendshipRequest(receiverId: String): Result<Unit> {
@@ -173,9 +157,14 @@ class FamilyRepositoryImpl @Inject constructor(
             }
 
             val senderProfile = supabaseClient.postgrest["profiles"]
-                .select(Columns.list("name, username")) { filter { eq("id", currentUserId) } }
+                .select(Columns.list("id, name, username")) {
+                    filter { eq("id", currentUserId) }
+                }
                 .decodeSingleOrNull<ProfileDataForRepository>()
-            val senderNameSnapshot = senderProfile?.name?.takeIf { it.isNotBlank() } ?: senderProfile?.username?.takeIf { it.isNotBlank() } ?: "A User"
+
+            val senderNameSnapshot = senderProfile?.name?.takeIf { it.isNotBlank() }
+                ?: senderProfile?.username?.takeIf { it.isNotBlank() }
+                ?: "A User"
 
             supabaseClient.postgrest["friendship_requests"].insert(
                 FriendshipRequest(
@@ -311,7 +300,7 @@ class FamilyRepositoryImpl @Inject constructor(
         return try {
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
             supabaseClient.postgrest["profiles"]
-                .select {
+                .select(Columns.list("id, name, username, status")) {
                     filter {
                         or {
                             ilike("name", "%$query%")

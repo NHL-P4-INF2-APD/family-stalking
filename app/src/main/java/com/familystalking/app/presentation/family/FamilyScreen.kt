@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
@@ -27,10 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.familystalking.app.domain.repository.PendingRequest
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.navigation.BottomNavBar
 import com.familystalking.app.ui.theme.PrimaryGreen
+import android.util.Log // Import Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -38,10 +37,49 @@ fun FamilyScreen(
     navController: NavController,
     viewModel: FamilyViewModel = hiltViewModel()
 ) {
+    Log.e("FAMILY_SCREEN_TEST", "FamilyScreen composable has been CALLED.") // <<< SMOKE TEST LOG
     val state by viewModel.state.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     val filteredMembers = state.familyMembers.filter {
         it.name.contains(searchQuery, ignoreCase = true)
+    }
+
+    if (state.showAddFriendDialog && state.scannedUserId != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissAddFriendDialog() },
+            title = { Text("Add Friend?") },
+            text = { Text("Do you want to send a friend request to ${state.scannedUserName ?: "this user"} (ID: ${state.scannedUserId})?") },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.sendFriendshipRequest() },
+                    enabled = !state.isSendingFriendRequest
+                ) {
+                    if (state.isSendingFriendRequest) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                    } else {
+                        Text("Send Request")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissAddFriendDialog() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (state.showRequestAlreadyPendingDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissRequestAlreadyPendingDialog() },
+            title = { Text("Request Status") },
+            text = { Text(state.requestAlreadyPendingMessage) },
+            confirmButton = {
+                Button(onClick = { viewModel.dismissRequestAlreadyPendingDialog() }) {
+                    Text("OK")
+                }
+            }
+        )
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -82,34 +120,34 @@ fun FamilyScreen(
                 }
             }
 
-            if (filteredMembers.isEmpty() && state.familyMembers.isNotEmpty()) {
+            if (state.isLoading && state.familyMembers.isEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (filteredMembers.isEmpty() && state.familyMembers.isNotEmpty() && searchQuery.isNotEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp).weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (searchQuery.isNotEmpty()) {
-                            "No friends found matching '$searchQuery'"
-                        } else {
-                            "You haven't added any friends yet."
-                        },
+                        text = "No friends found matching '$searchQuery'",
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.Gray
                     )
                 }
             } else if (state.familyMembers.isEmpty()) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp).weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "You haven't added any friends yet.",
+                        text = "You haven't added any friends yet. \nScan a QR code or search to add friends.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = Color.Gray
                     )
                 }
             } else {
-                LazyColumn(modifier = Modifier.padding(horizontal = 8.dp)) {
+                LazyColumn(modifier = Modifier.padding(horizontal = 8.dp).weight(1f)) {
                     items(filteredMembers) { member ->
                         Card(
                             modifier = Modifier
@@ -156,6 +194,7 @@ fun FamilyScreen(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(72.dp)) // Space for FABs and BottomNav
         }
 
         FloatingActionButton(
@@ -189,4 +228,4 @@ fun FamilyScreen(
             )
         }
     }
-} 
+}

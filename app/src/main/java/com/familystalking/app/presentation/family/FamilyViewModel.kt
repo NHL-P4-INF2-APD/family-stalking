@@ -43,52 +43,65 @@ class FamilyViewModel @Inject constructor(
     val state: StateFlow<FamilyScreenState> = _state.asStateFlow()
 
     init {
-        Log.d("FamilyViewModel", "VM: FamilyViewModel initialized by Hilt.")
+        Log.e("FAMILY_VIEW_MODEL_INIT_TEST", "--- FamilyViewModel INIT BLOCK HAS DEFINITELY RUN ---") // MOVED TO VERY TOP
         observeAuthStateAndLoadData()
     }
 
     private fun observeAuthStateAndLoadData() {
+        Log.e("FamilyViewModel_OBSERVE", "--- observeAuthStateAndLoadData CALLED ---")
         viewModelScope.launch {
             authenticationRepository.sessionState.collectLatest { sessionState ->
-                Log.d("FamilyViewModel", "VM: Observed Auth Session State: $sessionState")
-                if (sessionState is SessionState.Authenticated) {
-                    val authUserId = authenticationRepository.getCurrentUserId()
-                    if (_state.value.currentUserId != authUserId || _state.value.currentUser == null) {
-                        Log.d("FamilyViewModel", "VM: Auth state is Authenticated. Fetching current user and initial data for $authUserId.")
-                        fetchCurrentUserAndInitialDataInternal()
-                    } else {
-                        Log.d("FamilyViewModel", "VM: Auth state is Authenticated, but user data seems current. CurrentUserID: ${_state.value.currentUserId}")
-                        if (_state.value.isLoading) { // If was loading due to previous state, ensure it's false
-                            _state.update { it.copy(isLoading = false) }
+                Log.e("FamilyViewModel_SESSION", "--- Observed Auth Session State: $sessionState ---")
+                when (sessionState) {
+                    is SessionState.Authenticated -> {
+                        Log.e("FamilyViewModel_AUTHED", "--- State is Authenticated ---")
+                        val authUserId = authenticationRepository.getCurrentUserId()
+                        Log.e("FamilyViewModel_AUTHED", "--- Auth User ID from AuthRepo: $authUserId ---")
+
+                        if (authUserId != null) {
+                            if (_state.value.currentUserId != authUserId || _state.value.currentUser == null) {
+                                Log.e("FamilyViewModel_AUTHED", "--- Conditions met to fetch/refresh user data for $authUserId ---")
+                                fetchCurrentUserAndInitialDataInternal(authUserId)
+                            } else {
+                                Log.d("FamilyViewModel", "OBSERVE_AUTH: User data for $authUserId seems current. isLoading: ${_state.value.isLoading}")
+                                if (_state.value.isLoading && _state.value.currentUser != null) {
+                                    _state.update { it.copy(isLoading = false) }
+                                }
+                            }
+                        } else {
+                            Log.w("FamilyViewModel", "OBSERVE_AUTH: Auth state is Authenticated, but getCurrentUserId returned null. Clearing data.")
+                            _state.update { FamilyScreenState(isLoading = false) }
                         }
                     }
-                } else if (sessionState is SessionState.Unauthenticated) {
-                    Log.d("FamilyViewModel", "VM: Auth state is Unauthenticated. Clearing user specific data.")
-                    _state.update { FamilyScreenState(isLoading = false) }
-                } else if (sessionState is SessionState.Loading) {
-                    Log.d("FamilyViewModel", "VM: Auth state is Loading. Setting isLoading true.")
-                    _state.update { it.copy(isLoading = true) }
+                    is SessionState.Unauthenticated -> {
+                        Log.e("FamilyViewModel_UNAUTH", "--- State is Unauthenticated. Clearing user specific data. ---")
+                        _state.update { FamilyScreenState(isLoading = false) }
+                    }
+                    is SessionState.Loading -> {
+                        Log.e("FamilyViewModel_LOADING", "--- Auth state is Loading. Setting global isLoading true. ---")
+                        _state.update { it.copy(isLoading = true) }
+                    }
                 }
             }
         }
     }
 
-    private fun fetchCurrentUserAndInitialDataInternal() {
+    private fun fetchCurrentUserAndInitialDataInternal(authenticatedUserId: String) {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true) }
-            Log.d("FamilyViewModel", "VM: fetchCurrentUserAndInitialDataInternal called.")
+            Log.e("FamilyViewModel_FETCH_INT", "--- fetchCurrentUserAndInitialDataInternal called for authUserId: $authenticatedUserId ---")
 
             val user = familyRepository.getCurrentUser()
             val userId = user.id
-            Log.d("FamilyViewModel", "VM: Fetched user from repo: ${user.name} (ID: $userId).")
+            Log.e("FamilyViewModel_FETCH_INT", "--- Fetched user profile from repo: Name='${user.name}', ID='${user.id}' ---")
             _state.update { it.copy(currentUser = user, currentUserId = userId) }
 
-            if (userId != null) {
-                Log.d("FamilyViewModel", "VM: User ID ($userId) is not null. Fetching pending requests and family members.")
-                fetchPendingRequests(userId)
+            if (user.id != null) {
+                Log.d("FamilyViewModel", "FETCH_INTERNAL: User profile ID (${user.id}) is not null. Fetching pending requests and family members.")
+                fetchPendingRequests(user.id!!)
                 fetchFamilyMembers()
             } else {
-                Log.w("FamilyViewModel", "VM: User ID is null after fetching current user. Cannot fetch related data.")
+                Log.w("FamilyViewModel", "FETCH_INTERNAL: User profile ID is null after fetching current user. Cannot fetch related data.")
                 _state.update { it.copy(isLoading = false) }
             }
         }
@@ -199,10 +212,10 @@ class FamilyViewModel @Inject constructor(
     fun fetchPendingRequests(userId: String) {
         viewModelScope.launch {
             try {
-                Log.d("FamilyViewModel", "[fetchPendingRequests] Calling repository with userId: $userId.")
+                Log.i("FamilyViewModel", "[fetchPendingRequests] Calling repository with userId: $userId.")
                 val requests = familyRepository.getPendingRequests(userId)
                 _state.update { it.copy(pendingRequests = requests, hasPendingRequests = requests.isNotEmpty()) }
-                Log.d("FamilyViewModel", "[fetchPendingRequests] Found ${requests.size} requests. HasPending: ${requests.isNotEmpty()}")
+                Log.i("FamilyViewModel", "[fetchPendingRequests] Found ${requests.size} requests. HasPending: ${requests.isNotEmpty()}")
             } catch (e: Exception) {
                 Log.e("FamilyViewModel", "[fetchPendingRequests] Error: ${e.message}", e)
                 _state.update { it.copy(error = "Could not load pending requests.") }
