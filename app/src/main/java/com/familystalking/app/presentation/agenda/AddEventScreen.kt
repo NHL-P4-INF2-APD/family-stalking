@@ -43,6 +43,15 @@ import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.todayIn
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.familystalking.app.presentation.family.FamilyMember
+import com.familystalking.app.domain.repository.FamilyRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.familystalking.app.presentation.family.FamilyViewModel
+import androidx.compose.runtime.getValue
 
 private val CREATE_EVENT_BUTTON_COLOR = Color(0xFF66BB6A)
 
@@ -51,15 +60,23 @@ private val CREATE_EVENT_BUTTON_COLOR = Color(0xFF66BB6A)
 @Composable
 fun AddEventScreen(
     navController: NavController,
-    viewModel: AgendaViewModel = hiltViewModel()
+    viewModel: AgendaViewModel = hiltViewModel(),
+    familyViewModel: FamilyViewModel = hiltViewModel()
 ) {
     var eventTitle by remember { mutableStateOf("") }
     val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
     var selectedDate by remember { mutableStateOf(today) }
     var selectedTime by remember { mutableStateOf(LocalTime(12, 0)) }
     var location by remember { mutableStateOf("") }
-    var currentParticipant by remember { mutableStateOf("") }
-    val participants = remember { mutableStateListOf<String>() }
+    val selectedParticipants = remember { mutableStateListOf<String>() } // userIds
+    val familyState by familyViewModel.state.collectAsState()
+    val friends = familyState.familyMembers
+
+    LaunchedEffect(Unit) {
+        if (friends.isEmpty()) {
+            familyViewModel.fetchFamilyMembers()
+        }
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -175,49 +192,39 @@ fun AddEventScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                "Participants",
+                "Deelnemers",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant // Consistent label color
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = currentParticipant,
-                    onValueChange = { currentParticipant = it },
-                    placeholder = { Text("Add participants") },
-                    modifier = Modifier.weight(1f),
-                    leadingIcon = { Icon(Icons.Outlined.People, contentDescription = "Participants icon") },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = {
-                        if (currentParticipant.isNotBlank()) {
-                            participants.add(currentParticipant.trim())
-                            currentParticipant = ""
-                            keyboardController?.hide()
+            if (familyState.isLoading) {
+                CircularProgressIndicator()
+            } else if (friends.isEmpty()) {
+                Text("Geen vrienden gevonden", color = Color.Red)
+            } else {
+                Column {
+                    friends.forEach { friend ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (selectedParticipants.contains(friend.id)) {
+                                        selectedParticipants.remove(friend.id)
+                                    } else {
+                                        friend.id?.let { selectedParticipants.add(it) }
+                                    }
+                                }
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Checkbox(
+                                checked = selectedParticipants.contains(friend.id),
+                                onCheckedChange = {
+                                    if (it) friend.id?.let { id -> selectedParticipants.add(id) }
+                                    else friend.id?.let { id -> selectedParticipants.remove(id) }
+                                }
+                            )
+                            Text(friend.name)
                         }
-                    })
-                )
-                IconButton(onClick = {
-                    if (currentParticipant.isNotBlank()) {
-                        participants.add(currentParticipant.trim())
-                        currentParticipant = ""
-                        keyboardController?.hide()
-                    }
-                }, enabled = currentParticipant.isNotBlank()) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add participant")
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (participants.isNotEmpty()) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    participants.forEach { name ->
-                        ParticipantTag( // Ensure ParticipantTag is accessible and accepts modifier
-                            name = name,
-                            onRemove = { participants.remove(name) },
-                            showRemoveIcon = true,
-                            modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)
-                        )
                     }
                 }
             }
@@ -231,8 +238,8 @@ fun AddEventScreen(
                             date = selectedDate,
                             time = selectedTime,
                             location = location.takeIf { it.isNotBlank() },
-                            participants = participants.toList(),
-                            description = "New event: $eventTitle" // Or a dedicated description field
+                            participants = selectedParticipants.toList(),
+                            description = "New event: $eventTitle"
                         )
                         navController.popBackStack()
                     }

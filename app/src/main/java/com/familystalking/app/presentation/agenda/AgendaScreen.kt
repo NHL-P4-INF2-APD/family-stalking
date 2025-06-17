@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.familystalking.app.domain.model.Event
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.navigation.BottomNavBar
 
@@ -109,7 +110,7 @@ fun AgendaScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AgendaItemCard(item: AgendaItem, onClick: () -> Unit) {
+fun AgendaItemCard(item: Event, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -136,52 +137,25 @@ fun AgendaItemCard(item: AgendaItem, onClick: () -> Unit) {
                     ),
                     modifier = Modifier.weight(1f).padding(end = 8.dp)
                 )
-                if (item.time.isNotEmpty()) {
-                    Text(
-                        text = item.time,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Gray
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = item.dateLabel,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.DarkGray
-            )
-            item.location?.let {
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "At: $it",
-                    style = MaterialTheme.typography.bodySmall,
+                    text = item.startTime.toString().substring(11, 16),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = Color.Gray
                 )
             }
-            if (item.participants.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    item.participants.forEach { participant ->
-                        ParticipantTag(
-                            name = participant,
-                            onRemove = null,
-                            showRemoveIcon = false,
-                            modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)
-                        )
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = item.startTime.toString().substring(0, 10),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.DarkGray
+            )
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AgendaDetailPopup(item: AgendaItem, onDismiss: () -> Unit) {
+fun AgendaDetailPopup(item: Event, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(CARD_CORNER_RADIUS + 4.dp),
@@ -206,13 +180,13 @@ fun AgendaDetailPopup(item: AgendaItem, onDismiss: () -> Unit) {
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "${item.dateLabel} at ${item.time}",
+                    text = "${item.startTime.toString().substring(0, 10)} om ${item.startTime.toString().substring(11, 16)}",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.DarkGray
                 )
                 item.location?.let {
                     Text(
-                        "Location: $it",
+                        "Locatie: $it",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray
                     )
@@ -220,7 +194,7 @@ fun AgendaDetailPopup(item: AgendaItem, onDismiss: () -> Unit) {
                 Divider(modifier = Modifier.padding(vertical = 12.dp))
                 if (item.participants.isNotEmpty()) {
                     Text(
-                        text = "Participants:",
+                        text = "Deelnemers:",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Medium
                     )
@@ -240,7 +214,6 @@ fun AgendaDetailPopup(item: AgendaItem, onDismiss: () -> Unit) {
                         }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Details:",
@@ -249,13 +222,13 @@ fun AgendaDetailPopup(item: AgendaItem, onDismiss: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = item.description,
+                    text = item.description ?: "",
                     style = MaterialTheme.typography.bodyMedium,
                     lineHeight = 20.sp
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 Button(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("CLOSE")
+                    Text("SLUITEN")
                 }
             }
         }
