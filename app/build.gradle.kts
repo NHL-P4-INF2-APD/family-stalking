@@ -77,16 +77,17 @@ android {
 
 dependencies {
     implementation("com.google.ar:core:1.49.0")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     // Define versions in one place for better management
-    val composeBomVersion = "2024.02.00"
+    val composeBomVersion = "2024.05.00" // <-- THIS IS THE ONLY CHANGE
     val hiltVersion = "2.50"
     val supabaseVersion = "2.1.3"
     val lifecycleVersion = "2.7.0"
 
-    val cameraxVersion = "1.4.2" 
-    val detektPluginVersion = "1.23.5" 
-    val accompanistVersion = "0.31.5-beta" 
-    val zxingVersion = "3.5.2" 
+    val cameraxVersion = "1.4.2"
+    val detektPluginVersion = "1.23.5"
+    val accompanistVersion = "0.31.5-beta"
+    val zxingVersion = "3.5.2"
 
 
     // Core & Lifecycle

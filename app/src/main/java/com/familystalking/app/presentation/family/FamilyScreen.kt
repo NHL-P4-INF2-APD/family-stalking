@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
@@ -21,15 +22,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.ComposeView // <-- THE FIX
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.navigation.BottomNavBar
 import com.familystalking.app.ui.theme.PrimaryGreen
-import android.util.Log // Import Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +41,6 @@ fun FamilyScreen(
     navController: NavController,
     viewModel: FamilyViewModel = hiltViewModel()
 ) {
-    Log.e("FAMILY_SCREEN_TEST", "FamilyScreen composable has been CALLED.") // <<< SMOKE TEST LOG
     val state by viewModel.state.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     val filteredMembers = state.familyMembers.filter {
@@ -82,6 +85,27 @@ fun FamilyScreen(
         )
     }
 
+    if (state.showConfirmUnfriendDialog && state.userToUnfriend != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissUnfriendDialog() },
+            title = { Text("Remove Friend") },
+            text = { Text("Are you sure you want to remove ${state.userToUnfriend?.name} from your friends list?") },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.confirmUnfriend() },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissUnfriendDialog() }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier.fillMaxSize()
@@ -120,81 +144,37 @@ fun FamilyScreen(
                 }
             }
 
-            if (state.isLoading && state.familyMembers.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else if (filteredMembers.isEmpty() && state.familyMembers.isNotEmpty() && searchQuery.isNotEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp).weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No friends found matching '$searchQuery'",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Gray
-                    )
-                }
-            } else if (state.familyMembers.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().padding(top = 32.dp).weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "You haven't added any friends yet. \nScan a QR code or search to add friends.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color.Gray
-                    )
-                }
-            } else {
-                LazyColumn(modifier = Modifier.padding(horizontal = 8.dp).weight(1f)) {
-                    items(filteredMembers) { member ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            elevation = CardDefaults.cardElevation(4.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(Color.LightGray),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = member.name.take(2).uppercase(),
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp
-                                    )
-                                }
-                                Column(
-                                    modifier = Modifier.padding(start = 16.dp)
-                                ) {
-                                    Text(
-                                        text = member.name,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
-                                    Text(
-                                        text = member.status,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = Color.Gray
-                                    )
-                                }
-                            }
+            SwipeRefreshList(
+                isLoading = state.isLoading,
+                onRefresh = { viewModel.fetchFamilyMembers() },
+                modifier = Modifier.weight(1f)
+            ) {
+                if (filteredMembers.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (searchQuery.isNotEmpty()) {
+                                "No friends found matching '$searchQuery'"
+                            } else {
+                                "You haven't added any friends yet.\nPull down to refresh."
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.Gray
+                        )
+                    }
+                } else {
+                    LazyColumn(modifier = Modifier.padding(horizontal = 8.dp).fillMaxSize()) {
+                        items(filteredMembers, key = { it.id!! }) { member ->
+                            FriendCard(member = member, onUnfriendClick = {
+                                viewModel.onUnfriendClick(member)
+                            })
                         }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(72.dp)) // Space for FABs and BottomNav
+            Spacer(modifier = Modifier.height(72.dp))
         }
 
         FloatingActionButton(
@@ -226,6 +206,93 @@ fun FamilyScreen(
                 currentRoute = Screen.Family.route,
                 navController = navController
             )
+        }
+    }
+}
+
+@Composable
+fun SwipeRefreshList(
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            SwipeRefreshLayout(context).apply {
+                setOnRefreshListener {
+                    onRefresh()
+                }
+
+                val composeView = ComposeView(context).apply {
+                    setContent {
+                        MaterialTheme {
+                            content()
+                        }
+                    }
+                }
+                addView(composeView)
+            }
+        },
+        update = { swipeRefreshLayout ->
+            swipeRefreshLayout.isRefreshing = isLoading
+        }
+    )
+}
+
+@Composable
+fun FriendCard(
+    member: FamilyMember,
+    onUnfriendClick: (FamilyMember) -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(8.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = member.name.take(2).uppercase(),
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            }
+            Column(
+                modifier = Modifier.padding(start = 16.dp).weight(1f)
+            ) {
+                Text(
+                    text = member.name,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = member.status,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+            }
+            IconButton(onClick = { onUnfriendClick(member) }) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Remove Friend",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
         }
     }
 }

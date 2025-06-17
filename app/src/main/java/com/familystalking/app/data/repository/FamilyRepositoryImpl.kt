@@ -74,7 +74,6 @@ class FamilyRepositoryImpl @Inject constructor(
             val result = friendsProfileData.map { profile ->
                 FamilyMember(
                     id = profile.id,
-                    // UPDATED: Prioritize username, then name, then a default
                     name = profile.username?.takeIf { it.isNotBlank() } ?: profile.name?.takeIf { it.isNotBlank() } ?: "Unknown User",
                     status = profile.status ?: "Offline"
                 )
@@ -114,7 +113,6 @@ class FamilyRepositoryImpl @Inject constructor(
                 Log.e("FamilyRepositoryImpl", "[getCurrentUser] Generic Exception fetching profile for $userId: ${e.message}", e)
             }
 
-            // UPDATED: Prioritize username, then name, then email-based default
             val finalName = profileData?.username?.takeIf { it.isNotBlank() }
                 ?: profileData?.name?.takeIf { it.isNotBlank() }
                 ?: defaultNameFromEmail(userEmail)
@@ -172,7 +170,6 @@ class FamilyRepositoryImpl @Inject constructor(
                 }
                 .decodeSingleOrNull<ProfileDataForRepository>()
 
-            // UPDATED: Prioritize username for the snapshot
             val senderNameSnapshot = senderProfile?.username?.takeIf { it.isNotBlank() }
                 ?: senderProfile?.name?.takeIf { it.isNotBlank() }
                 ?: "A User"
@@ -273,7 +270,6 @@ class FamilyRepositoryImpl @Inject constructor(
                 .map { profile ->
                     FamilyMember(
                         id = profile.id,
-                        // UPDATED: Prioritize username for consistency in search results
                         name = profile.username?.takeIf { it.isNotBlank() } ?: profile.name?.takeIf { it.isNotBlank() } ?: "User",
                         status = profile.status ?: "Offline"
                     )
@@ -281,6 +277,28 @@ class FamilyRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Log.e("FamilyRepositoryImpl", "searchUsers failed", e)
             emptyList()
+        }
+    }
+
+    override suspend fun removeFriend(friendId: String): Result<Unit> {
+        return try {
+            val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
+                ?: return Result.failure(IllegalStateException("User not authenticated."))
+
+            Log.d("FamilyRepositoryImpl", "[removeFriend] Attempting to remove friendship between $currentUserId and $friendId")
+
+            supabaseClient.postgrest.rpc(
+                function = "remove_friendship",
+                parameters = mapOf(
+                    "user1_id" to currentUserId,
+                    "user2_id" to friendId
+                )
+            )
+            Log.i("FamilyRepositoryImpl", "[removeFriend] Successfully called RPC to remove friendship.")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e("FamilyRepositoryImpl", "[removeFriend] Failed to remove friend", e)
+            Result.failure(e)
         }
     }
 }
