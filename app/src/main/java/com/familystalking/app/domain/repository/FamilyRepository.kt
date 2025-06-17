@@ -2,7 +2,6 @@ package com.familystalking.app.domain.repository
 
 import com.familystalking.app.presentation.family.FamilyMember
 
-// This is the interface file. Ensure it has all the function definitions.
 interface FamilyRepository {
 
     suspend fun getFamilyMembers(): List<FamilyMember>
@@ -25,8 +24,6 @@ interface FamilyRepository {
     suspend fun removeFriend(friendId: String): Result<Unit>
 }
 
-// Your PendingRequest data class likely lives here or in a related model file.
-// I'm including it for completeness.
 data class PendingRequest(
     val id: String,
     val senderId: String,

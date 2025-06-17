@@ -22,8 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.ComposeView // <-- THE FIX
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,7 +34,6 @@ import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.navigation.BottomNavBar
 import com.familystalking.app.ui.theme.PrimaryGreen
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FamilyScreen(
     navController: NavController,
