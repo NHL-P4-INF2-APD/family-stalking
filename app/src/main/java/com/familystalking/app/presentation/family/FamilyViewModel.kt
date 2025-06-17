@@ -99,6 +99,7 @@ class FamilyViewModel @Inject constructor(
             if (user.id != null) {
                 Log.d("FamilyViewModel", "FETCH_INTERNAL: User profile ID (${user.id}) is not null. Fetching pending requests and family members.")
                 fetchPendingRequests(user.id!!)
+                Log.d("FamilyViewModel", "FETCH_INTERNAL: About to call fetchFamilyMembers()")
                 fetchFamilyMembers()
             } else {
                 Log.w("FamilyViewModel", "FETCH_INTERNAL: User profile ID is null after fetching current user. Cannot fetch related data.")
@@ -109,11 +110,16 @@ class FamilyViewModel @Inject constructor(
 
     fun fetchFamilyMembers() {
         viewModelScope.launch {
+            Log.d("FamilyViewModel", "[fetchFamilyMembers] START - Current state: familyMembers=${_state.value.familyMembers.size}, currentUserId=${_state.value.currentUserId}")
             _state.update { it.copy(isLoading = true) }
             try {
                 val members = familyRepository.getFamilyMembers()
+                Log.d("FamilyViewModel", "[fetchFamilyMembers] Repository returned ${members.size} members")
+                members.forEach { member ->
+                    Log.d("FamilyViewModel", "[fetchFamilyMembers] Member: id=${member.id}, name=${member.name}, status=${member.status}")
+                }
                 _state.update { it.copy(familyMembers = members, isLoading = false) }
-                Log.d("FamilyViewModel", "[fetchFamilyMembers] Fetched ${members.size} family members.")
+                Log.d("FamilyViewModel", "[fetchFamilyMembers] State updated with ${members.size} family members.")
             } catch (e: Exception) {
                 Log.e("FamilyViewModel", "[fetchFamilyMembers] Error fetching family members", e)
                 _state.update { it.copy(error = "Could not load family members.", isLoading = false) }
@@ -184,13 +190,20 @@ class FamilyViewModel @Inject constructor(
 
     fun acceptFriendshipRequest(request: PendingRequest) {
         viewModelScope.launch {
+            Log.d("FamilyViewModel", "[acceptFriendshipRequest] START - Accepting request from ${request.senderName} (ID: ${request.senderId})")
             _state.update { it.copy(isLoading = true) }
             val result = familyRepository.acceptFriendshipRequest(request)
             if (result.isSuccess) {
-                _state.value.currentUserId?.let { fetchPendingRequests(it) }
+                Log.d("FamilyViewModel", "[acceptFriendshipRequest] SUCCESS - Request accepted, now refreshing data")
+                _state.value.currentUserId?.let {
+                    Log.d("FamilyViewModel", "[acceptFriendshipRequest] Fetching pending requests for user: $it")
+                    fetchPendingRequests(it)
+                }
+                Log.d("FamilyViewModel", "[acceptFriendshipRequest] Now fetching family members...")
                 fetchFamilyMembers()
                 _state.update { it.copy(successMessage = "Friend request from ${request.senderName} accepted!") }
             } else {
+                Log.e("FamilyViewModel", "[acceptFriendshipRequest] FAILED - ${result.exceptionOrNull()?.message}")
                 _state.update { it.copy(error = result.exceptionOrNull()?.message ?: "Failed to accept request.", isLoading = false) }
             }
         }

@@ -49,12 +49,19 @@ class FamilyRepositoryImpl @Inject constructor(
     override suspend fun getFamilyMembers(): List<FamilyMember> {
         return try {
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return emptyList()
-            val friendEntries = supabaseClient.postgrest["friends"].select {
+            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Current user ID: $currentUserId")
+
+            val myFriendships = supabaseClient.postgrest["friends"].select {
                 filter { eq("user_id", currentUserId) }
             }.decodeList<Friend>()
 
-            val friendIds = friendEntries.map { it.friendId }
-            if (friendIds.isEmpty()) return emptyList()
+            if (myFriendships.isEmpty()) {
+                Log.d("FamilyRepositoryImpl", "[getFamilyMembers] No friendships found for user: $currentUserId")
+                return emptyList()
+            }
+
+            val friendIds = myFriendships.map { it.friendId }
+            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Friend IDs to lookup: $friendIds")
 
             val friendsProfileData = supabaseClient.postgrest["profiles"].select(
                 Columns.list("id, name, username, status")
@@ -62,15 +69,21 @@ class FamilyRepositoryImpl @Inject constructor(
                 filter { isIn("id", friendIds) }
             }.decodeList<ProfileDataForRepository>()
 
-            friendsProfileData.map { profile ->
+            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Found ${friendsProfileData.size} profile records for friends")
+
+            val result = friendsProfileData.map { profile ->
                 FamilyMember(
                     id = profile.id,
-                    name = profile.name?.takeIf { it.isNotBlank() } ?: profile.username?.takeIf {it.isNotBlank()} ?: "Unknown User",
+                    // UPDATED: Prioritize username, then name, then a default
+                    name = profile.username?.takeIf { it.isNotBlank() } ?: profile.name?.takeIf { it.isNotBlank() } ?: "Unknown User",
                     status = profile.status ?: "Offline"
                 )
             }
+
+            Log.d("FamilyRepositoryImpl", "[getFamilyMembers] Mapped ${result.size} family members to display")
+            result
         } catch (e: Exception) {
-            Log.e("FamilyRepositoryImpl", "[getFamilyMembers] Failed", e)
+            Log.e("FamilyRepositoryImpl", "[getFamilyMembers] EXCEPTION: ${e.message}", e)
             emptyList()
         }
     }
@@ -101,8 +114,9 @@ class FamilyRepositoryImpl @Inject constructor(
                 Log.e("FamilyRepositoryImpl", "[getCurrentUser] Generic Exception fetching profile for $userId: ${e.message}", e)
             }
 
-            val finalName = profileData?.name?.takeIf { it.isNotBlank() }
-                ?: profileData?.username?.takeIf { it.isNotBlank() }
+            // UPDATED: Prioritize username, then name, then email-based default
+            val finalName = profileData?.username?.takeIf { it.isNotBlank() }
+                ?: profileData?.name?.takeIf { it.isNotBlank() }
                 ?: defaultNameFromEmail(userEmail)
             val finalStatus = profileData?.status?.takeIf { it.isNotBlank() } ?: defaultStatus
 
@@ -114,18 +128,14 @@ class FamilyRepositoryImpl @Inject constructor(
         }
     }
 
-    // --- ADDED THIS MISSING IMPLEMENTATION ---
     override suspend fun getCurrentUserId(): String? {
         return try {
-            val userId = supabaseClient.auth.currentUserOrNull()?.id
-            Log.d("FamilyRepositoryImpl", "[getCurrentUserId] User ID from auth: $userId")
-            userId
+            supabaseClient.auth.currentUserOrNull()?.id
         } catch (e: Exception) {
             Log.e("FamilyRepositoryImpl", "[getCurrentUserId] Error fetching user ID", e)
             null
         }
     }
-    // --- END OF ADDED IMPLEMENTATION ---
 
     @RequiresApi(Build.VERSION_CODES.O)
     override suspend fun sendFriendshipRequest(receiverId: String): Result<Unit> {
@@ -162,8 +172,9 @@ class FamilyRepositoryImpl @Inject constructor(
                 }
                 .decodeSingleOrNull<ProfileDataForRepository>()
 
-            val senderNameSnapshot = senderProfile?.name?.takeIf { it.isNotBlank() }
-                ?: senderProfile?.username?.takeIf { it.isNotBlank() }
+            // UPDATED: Prioritize username for the snapshot
+            val senderNameSnapshot = senderProfile?.username?.takeIf { it.isNotBlank() }
+                ?: senderProfile?.name?.takeIf { it.isNotBlank() }
                 ?: "A User"
 
             supabaseClient.postgrest["friendship_requests"].insert(
@@ -189,74 +200,34 @@ class FamilyRepositoryImpl @Inject constructor(
 
     override suspend fun acceptFriendshipRequest(request: PendingRequest): Result<Unit> {
         Log.d("FamilyRepositoryImpl", "[acceptFriendshipRequest] Attempting for request ID: ${request.id}, Sender: ${request.senderId}")
-
-        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-        if (currentUserId == null) {
-            Log.e("FamilyRepositoryImpl", "[acceptFriendshipRequest] Current user is not authenticated.")
-            return Result.failure(IllegalStateException("User not authenticated to accept request."))
-        }
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return Result.failure(IllegalStateException("User not authenticated to accept request."))
 
         return try {
             val fullRequest = supabaseClient.postgrest["friendship_requests"]
-                .select {
-                    filter {
-                        eq("id", request.id)
-                        eq("receiver_id", currentUserId)
-                        eq("status", "pending")
-                    }
-                }
-                .decodeSingleOrNull<FriendshipRequest>()
-
-            if (fullRequest == null) {
-                Log.w("FamilyRepositoryImpl", "[acceptFriendshipRequest] Request ID ${request.id} not found, not pending, or not for this user ($currentUserId).")
-                return Result.failure(NoSuchElementException("Friendship request not found or already processed."))
-            }
-
-            Log.d("FamilyRepositoryImpl", "[acceptFriendshipRequest] Found request to accept: $fullRequest")
+                .select { filter { eq("id", request.id); eq("receiver_id", currentUserId); eq("status", "pending") } }
+                .decodeSingleOrNull<FriendshipRequest>() ?: return Result.failure(NoSuchElementException("Friendship request not found or already processed."))
 
             supabaseClient.postgrest["friendship_requests"]
-                .update( { set("status", "accepted") } ) {
-                    filter { eq("id", fullRequest.id) }
-                }
-
-            Log.d("FamilyRepositoryImpl", "[acceptFriendshipRequest] Request status updated to 'accepted' for ID: ${fullRequest.id}")
+                .update( { set("status", "accepted") } ) { filter { eq("id", fullRequest.id) } }
 
             supabaseClient.postgrest.rpc(
                 function = "create_friendship",
-                parameters = mapOf(
-                    "user1_id" to fullRequest.senderId,
-                    "user2_id" to fullRequest.receiverId
-                )
+                parameters = mapOf("user1_id" to fullRequest.senderId, "user2_id" to fullRequest.receiverId)
             )
             Log.i("FamilyRepositoryImpl", "[acceptFriendshipRequest] Called create_friendship RPC for ${fullRequest.senderId} and ${fullRequest.receiverId}.")
             Result.success(Unit)
-        } catch (e: RestException) {
-            Log.e("FamilyRepositoryImpl", "[acceptFriendshipRequest] RestException for request ID: ${request.id}. Message: ${e.message}, Error: ${e.error}", e)
-            Result.failure(e)
         } catch (e: Exception) {
-            Log.e("FamilyRepositoryImpl", "[acceptFriendshipRequest] Generic failed for request ID: ${request.id}", e)
+            Log.e("FamilyRepositoryImpl", "[acceptFriendshipRequest] Failed for request ID: ${request.id}", e)
             Result.failure(e)
         }
     }
 
     override suspend fun declineFriendshipRequest(request: PendingRequest): Result<Unit> {
-        Log.d("FamilyRepositoryImpl", "[declineFriendshipRequest] Attempting for request ID: ${request.id}")
-        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id
-        if (currentUserId == null) {
-            Log.e("FamilyRepositoryImpl", "[declineFriendshipRequest] Current user is not authenticated.")
-            return Result.failure(IllegalStateException("User not authenticated to decline request."))
-        }
+        val currentUserId = supabaseClient.auth.currentUserOrNull()?.id ?: return Result.failure(IllegalStateException("User not authenticated to decline request."))
 
         return try {
             supabaseClient.postgrest["friendship_requests"]
-                .delete {
-                    filter {
-                        eq("id", request.id)
-                        eq("receiver_id", currentUserId)
-                        eq("status", "pending")
-                    }
-                }
-            Log.i("FamilyRepositoryImpl", "[declineFriendshipRequest] Delete request sent for ID: ${request.id}")
+                .delete { filter { eq("id", request.id); eq("receiver_id", currentUserId); eq("status", "pending") } }
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e("FamilyRepositoryImpl", "[declineFriendshipRequest] Failed for request ID: ${request.id}", e)
@@ -265,33 +236,21 @@ class FamilyRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getPendingRequests(userId: String): List<PendingRequest> {
-        Log.d("FamilyRepositoryImpl", "[getPendingRequests] Attempting to fetch for receiver_id: $userId")
         try {
             val requestsData = supabaseClient.postgrest["friendship_requests"]
-                .select {
-                    filter {
-                        eq("receiver_id", userId)
-                        eq("status", "pending")
-                    }
-                }.decodeList<FriendshipRequest>()
-
-            Log.d("FamilyRepositoryImpl", "[getPendingRequests] Raw requestsData count for receiver_id $userId (status 'pending'): ${requestsData.size}")
+                .select { filter { eq("receiver_id", userId); eq("status", "pending") } }
+                .decodeList<FriendshipRequest>()
 
             return requestsData.mapNotNull { request ->
-                val senderNameToDisplay = request.senderNameSnapshot?.takeIf { it.isNotBlank() } ?: "Unknown Sender"
                 PendingRequest(
                     id = request.id,
                     senderId = request.senderId,
-                    senderName = senderNameToDisplay,
+                    senderName = request.senderNameSnapshot?.takeIf { it.isNotBlank() } ?: "Unknown Sender",
                     timestamp = request.timestampValue
                 )
             }
-        } catch (e: RestException) {
-            Log.e("FamilyRepositoryImpl", "[getPendingRequests] RestException for $userId: ${e.message} Error: ${e.error}", e)
-            return emptyList()
-        }
-        catch (e: Exception) {
-            Log.e("FamilyRepositoryImpl", "[getPendingRequests] Generic error for $userId: ${e.message}", e)
+        } catch (e: Exception) {
+            Log.e("FamilyRepositoryImpl", "[getPendingRequests] Error for $userId: ${e.message}", e)
             return emptyList()
         }
     }
@@ -314,7 +273,8 @@ class FamilyRepositoryImpl @Inject constructor(
                 .map { profile ->
                     FamilyMember(
                         id = profile.id,
-                        name = profile.name?.takeIf { it.isNotBlank() } ?: profile.username?.takeIf { it.isNotBlank() } ?: "User",
+                        // UPDATED: Prioritize username for consistency in search results
+                        name = profile.username?.takeIf { it.isNotBlank() } ?: profile.name?.takeIf { it.isNotBlank() } ?: "User",
                         status = profile.status ?: "Offline"
                     )
                 }
