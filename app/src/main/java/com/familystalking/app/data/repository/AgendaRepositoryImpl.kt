@@ -1,0 +1,112 @@
+package com.familystalking.app.data.repository
+
+import com.familystalking.app.domain.model.Event
+import com.familystalking.app.domain.model.EventAttendee
+import com.familystalking.app.domain.repository.AgendaRepository
+import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.query.Columns
+import kotlinx.datetime.LocalDateTime
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import javax.inject.Inject
+
+@Serializable
+data class CalendarEventRow(
+    @SerialName("calendar_id") val id: String,
+    @SerialName("family_id") val familyId: String?,
+    val title: String,
+    val description: String?,
+    @SerialName("start_time") val startTime: String,
+    @SerialName("end_time") val endTime: String?,
+    val location: String?,
+    @SerialName("created_by") val createdBy: String
+)
+
+@Serializable
+data class EventAttendeeRow(
+    @SerialName("event_id") val eventId: String,
+    @SerialName("user_id") val userId: String,
+    val status: String? = null
+)
+
+class AgendaRepositoryImpl @Inject constructor(
+    private val supabaseClient: SupabaseClient
+) : AgendaRepository {
+    override suspend fun getEventsForUser(userId: String): List<Event> {
+        // Haal alle event_ids op waar user attendee is
+        val attendeeRows = supabaseClient.from("event_attendees").select {
+            filter { eq("user_id", userId) }
+        }.decodeList<EventAttendeeRow>()
+        val eventIds = attendeeRows.map { it.eventId }
+        if (eventIds.isEmpty()) return emptyList()
+        // Haal alle events op voor deze eventIds
+        val eventRows = supabaseClient.from("calendar_events").select {
+            filter { isIn("calendar_id", eventIds) }
+        }.decodeList<CalendarEventRow>()
+        return eventRows.map { row ->
+            val attendees = getEventAttendees(row.id)
+            Event(
+                id = row.id,
+                title = row.title,
+                description = row.description,
+                startTime = LocalDateTime.parse(row.startTime),
+                endTime = row.endTime?.let { LocalDateTime.parse(it) },
+                location = row.location,
+                createdBy = row.createdBy,
+                participants = attendees.map { it.name }
+            )
+        }
+    }
+
+    override suspend fun addEvent(event: Event, attendees: List<EventAttendee>) {
+        // Voeg event toe
+        supabaseClient.from("calendar_events").insert(
+            CalendarEventRow(
+                id = event.id,
+                familyId = null, // optioneel, afhankelijk van je app
+                title = event.title,
+                description = event.description,
+                startTime = event.startTime.toString(),
+                endTime = event.endTime?.toString(),
+                location = event.location,
+                createdBy = event.createdBy
+            )
+        )
+        // Voeg alle attendees toe
+        attendees.forEach { attendee ->
+            supabaseClient.from("event_attendees").insert(
+                EventAttendeeRow(
+                    eventId = event.id,
+                    userId = attendee.userId
+                )
+            )
+        }
+    }
+
+    override suspend fun getEventAttendees(eventId: String): List<EventAttendee> {
+        val attendeeRows = supabaseClient.from("event_attendees").select {
+            filter { eq("event_id", eventId) }
+        }.decodeList<EventAttendeeRow>()
+        // Haal e-mail op voor elke user_id en maak naam
+        return attendeeRows.map { row ->
+            val userEmail = getUserEmail(row.userId)
+            val name = userEmail?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Onbekend"
+            EventAttendee(
+                eventId = row.eventId,
+                userId = row.userId,
+                name = name
+            )
+        }
+    }
+
+    private suspend fun getUserEmail(userId: String): String? {
+        // Haal e-mail op uit users tabel
+        val users = supabaseClient.from("users").select {
+            filter { eq("user_id", userId) }
+        }.data
+        val user = users.firstOrNull() as? Map<*, *>
+        return user?.get("email") as? String
+    }
+} 

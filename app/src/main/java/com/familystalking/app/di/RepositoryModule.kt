@@ -6,6 +6,8 @@ import com.familystalking.app.data.repository.ProfileRepositoryImpl
 import com.familystalking.app.data.repository.ProfileRepository
 import com.familystalking.app.data.repository.FamilyRepositoryImpl
 import com.familystalking.app.domain.repository.FamilyRepository
+import com.familystalking.app.data.repository.AgendaRepositoryImpl
+import com.familystalking.app.domain.repository.AgendaRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,4 +35,10 @@ abstract class RepositoryModule {
     abstract fun bindFamilyRepository(
         familyRepositoryImpl: FamilyRepositoryImpl
     ): FamilyRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAgendaRepository(
+        agendaRepositoryImpl: AgendaRepositoryImpl
+    ): AgendaRepository
 }
