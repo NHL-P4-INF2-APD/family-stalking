@@ -192,11 +192,13 @@ class MapViewModel @Inject constructor(
         if (isSharingEnabled && currentLocation != null) {
             try {
                 Log.d(TAG, "Calling locationRepository.updateUserLocation...")
+                val currentBattery = _batteryPercentage.value
                 locationRepository.updateUserLocation(
                     latitude = currentLocation.latitude,
-                    longitude = currentLocation.longitude
+                    longitude = currentLocation.longitude,
+                    batteryLevel = currentBattery
                 )
-                Log.d(TAG, "✅ Location shared successfully to backend: ${currentLocation.latitude}, ${currentLocation.longitude}")
+                Log.d(TAG, "✅ Location shared successfully to backend: ${currentLocation.latitude}, ${currentLocation.longitude}, battery: ${currentBattery}%")
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Failed to share location to backend", e)
             }

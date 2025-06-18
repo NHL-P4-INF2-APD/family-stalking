@@ -639,13 +639,25 @@ private fun FriendMarker(
                 }
             }
             
-            // Sharing icon (always show as visible for friends)
-            Icon(
-                imageVector = Icons.Filled.Visibility,
-                contentDescription = "Friend Location",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(SHARING_ICON_SIZE_DP)
-            )
+            // Show battery and sharing icon for friends
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(MARKER_ELEMENT_SPACING_DP)
+            ) {
+                // Show battery if available
+                friendLocation.location.batteryLevel?.let { batteryLevel ->
+                    if (shouldShowBattery) {
+                        BatteryIndicator(batteryPercentage = batteryLevel)
+                    }
+                }
+                // Sharing icon (always show as visible for friends)
+                Icon(
+                    imageVector = Icons.Filled.Visibility,
+                    contentDescription = "Friend Location",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(SHARING_ICON_SIZE_DP)
+                )
+            }
             
             Spacer(modifier = Modifier.height(4.dp))
             ProfileMarker(initials = initials)

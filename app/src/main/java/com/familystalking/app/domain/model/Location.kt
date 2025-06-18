@@ -9,7 +9,8 @@ data class Location(
     val userId: UUID,
     val latitude: Double,
     val longitude: Double,
-    val timestamp: Instant
+    val timestamp: Instant,
+    val batteryLevel: Int? = null
 )
 
 data class FamilyMemberLocation(

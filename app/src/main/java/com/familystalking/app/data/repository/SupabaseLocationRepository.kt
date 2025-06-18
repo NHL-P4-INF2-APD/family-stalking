@@ -28,6 +28,7 @@ private data class LocationRow(
     val latitude: Double,
     val longitude: Double,
     val timestamp: String,
+    @SerialName("battery_level") val batteryLevel: Int? = null,
 ) {
     @RequiresApi(Build.VERSION_CODES.O)
     fun toDomain() =
@@ -37,6 +38,7 @@ private data class LocationRow(
             latitude = latitude,
             longitude = longitude,
             timestamp = Instant.parse(timestamp),
+            batteryLevel = batteryLevel,
         )
 }
 
@@ -71,9 +73,10 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
     override suspend fun updateUserLocation(
         latitude: Double,
         longitude: Double,
+        batteryLevel: Int?
     ) {
         try {
-            Log.d(TAG, "🔄 updateUserLocation called with lat=$latitude, lng=$longitude")
+            Log.d(TAG, "🔄 updateUserLocation called with lat=$latitude, lng=$longitude, battery=$batteryLevel")
             
             val currentUser = supabaseClient.auth.currentUserOrNull()
             Log.d(TAG, "Current user from Supabase: ${currentUser?.id}")
@@ -89,6 +92,7 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
                 latitude = latitude,
                 longitude = longitude,
                 timestamp = Instant.now().toString(),
+                batteryLevel = batteryLevel
             )
             
             Log.d(TAG, "Inserting location row: $locationRow")
@@ -105,7 +109,7 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
     override suspend fun getUserLocation(userId: UUID): Location? {
         return try {
             supabaseClient.postgrest["locations"]
-                .select(Columns.list("user_id", "latitude", "longitude", "timestamp")) {
+                .select(Columns.list("user_id", "latitude", "longitude", "timestamp", "battery_level")) {
                     filter { eq("user_id", userId.toString()) }
                     order("timestamp", Order.DESCENDING)
                     limit(1)
@@ -177,7 +181,7 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
 
                 return try {
                     supabaseClient.postgrest["locations"]
-                        .select(Columns.list("user_id", "latitude", "longitude", "timestamp")) {
+                        .select(Columns.list("user_id", "latitude", "longitude", "timestamp", "battery_level")) {
                             filter {
                                 isIn("user_id", friendIds)
                             }
