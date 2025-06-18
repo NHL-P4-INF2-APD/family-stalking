@@ -326,11 +326,7 @@ fun MapScreen(
         // The effect's job is to get location if permissions are met for local display.
         // ViewModel handles backend sharing based on the preference.
         onLocationUpdate = { newLocation -> 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                viewModel.updateLocation(newLocation)
-            } else {
-                viewModel.updateLocation(newLocation)
-            }
+            viewModel.updateLocation(newLocation)
         },
         onUiMessage = { message -> uiMessage = message },
         onShowLocationDisabledAlert = { showLocationDisabledAlert = it }
