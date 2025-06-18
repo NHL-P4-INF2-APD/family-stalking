@@ -152,72 +152,62 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
     @RequiresApi(Build.VERSION_CODES.O)
     override fun getFamilyMembersLocations(): Flow<List<FamilyMemberLocation>> {
         return flow {
-            try {
-                val friendIds = getFriendIds()
+            // Helper function to fetch locations for a list of friend IDs
+            suspend fun fetchLocationsForFriends(friendIds: List<String>): List<FamilyMemberLocation> {
                 if (friendIds.isEmpty()) {
-                    Log.d(TAG, "No friends found, emitting empty list")
-                    emit(emptyList())
-                    return@flow
+                    return emptyList()
                 }
 
-                Log.d(TAG, "Fetching locations for ${friendIds.size} friends")
-
-                // Get latest location for each friend
-                val familyMembersLocations = supabaseClient.postgrest["locations"]
-                    .select(Columns.list("user_id", "latitude", "longitude", "timestamp")) {
-                        filter {
-                            isIn("user_id", friendIds.map { UUID.fromString(it).toString() })
+                return try {
+                    supabaseClient.postgrest["locations"]
+                        .select(Columns.list("user_id", "latitude", "longitude", "timestamp")) {
+                            filter {
+                                isIn("user_id", friendIds.map { UUID.fromString(it).toString() })
+                            }
+                            order("timestamp", Order.DESCENDING)
                         }
-                        order("timestamp", Order.DESCENDING)
-                    }
-                    .decodeList<LocationRow>()
-                    .groupBy { it.userId }
-                    .mapNotNull { (userId, locations) ->
-                        val latestLocation = locations.maxByOrNull { Instant.parse(it.timestamp) }
-                        latestLocation?.let {
-                            FamilyMemberLocation(
-                                userId = userId,
-                                name = getFamilyMemberName(userId),
-                                location = it.toDomain()
-                            )
+                        .decodeList<LocationRow>()
+                        .groupBy { it.userId }
+                        .mapNotNull { (userId, locations) ->
+                            val latestLocation = locations.maxByOrNull { Instant.parse(it.timestamp) }
+                            latestLocation?.let {
+                                FamilyMemberLocation(
+                                    userId = userId,
+                                    name = getFamilyMemberName(userId),
+                                    location = it.toDomain()
+                                )
+                            }
                         }
-                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error fetching locations for friends", e)
+                    emptyList()
+                }
+            }
 
-                Log.d(TAG, "Found locations for ${familyMembersLocations.size} friends")
-                emit(familyMembersLocations)
+            try {
+                // Initial fetch
+                val initialFriendIds = getFriendIds()
+                Log.d(TAG, "Initial fetch: Found ${initialFriendIds.size} friends")
+                
+                val initialLocations = fetchLocationsForFriends(initialFriendIds)
+                Log.d(TAG, "Initial fetch: Found locations for ${initialLocations.size} friends")
+                emit(initialLocations)
 
-                // For now, we'll implement a simple polling mechanism
-                // TODO: Implement proper realtime subscriptions later
+                // Start polling mechanism
                 while (true) {
                     kotlinx.coroutines.delay(30000) // Poll every 30 seconds
                     
                     try {
                         val updatedFriendIds = getFriendIds()
-                        if (updatedFriendIds.isNotEmpty()) {
-                            val updatedLocations = supabaseClient.postgrest["locations"]
-                                .select(Columns.list("user_id", "latitude", "longitude", "timestamp")) {
-                                    filter {
-                                        isIn("user_id", updatedFriendIds.map { UUID.fromString(it).toString() })
-                                    }
-                                    order("timestamp", Order.DESCENDING)
-                                }
-                                .decodeList<LocationRow>()
-                                .groupBy { it.userId }
-                                .mapNotNull { (userId, locations) ->
-                                    val latestLocation = locations.maxByOrNull { Instant.parse(it.timestamp) }
-                                    latestLocation?.let {
-                                        FamilyMemberLocation(
-                                            userId = userId,
-                                            name = getFamilyMemberName(userId),
-                                            location = it.toDomain()
-                                        )
-                                    }
-                                }
-                            
-                            emit(updatedLocations)
-                        }
+                        Log.d(TAG, "Polling: Found ${updatedFriendIds.size} friends")
+                        
+                        val updatedLocations = fetchLocationsForFriends(updatedFriendIds)
+                        Log.d(TAG, "Polling: Found locations for ${updatedLocations.size} friends")
+                        
+                        emit(updatedLocations)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error polling for location updates", e)
+                        Log.e(TAG, "Error during polling for location updates", e)
+                        // Continue polling even if there's an error
                     }
                 }
             } catch (e: Exception) {
