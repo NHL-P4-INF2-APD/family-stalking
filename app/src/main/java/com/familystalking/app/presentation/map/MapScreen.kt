@@ -585,20 +585,20 @@ private fun UserMarker(
         anchor = Offset(MARKER_ANCHOR_X, MARKER_ANCHOR_Y)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(MARKER_ELEMENT_SPACING_DP)
-            ) {
-                if (shouldShowBattery) {
-                    BatteryIndicator(batteryPercentage = batteryPercentage)
-                }
-                Icon(
-                    imageVector = if (isSharingLocation) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = if (isSharingLocation) "Location Sharing ON" else "Location Sharing OFF",
-                    tint = if (isSharingLocation) MaterialTheme.colorScheme.primary else Color.Gray,
-                    modifier = Modifier.size(SHARING_ICON_SIZE_DP)
-                )
+            // Eye icon above battery
+            Icon(
+                imageVector = if (isSharingLocation) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                contentDescription = if (isSharingLocation) "Location Sharing ON" else "Location Sharing OFF",
+                tint = if (isSharingLocation) MaterialTheme.colorScheme.primary else Color.Gray,
+                modifier = Modifier.size(SHARING_ICON_SIZE_DP)
+            )
+            
+            // Battery below eye (if enabled)
+            if (shouldShowBattery) {
+                Spacer(modifier = Modifier.height(2.dp))
+                BatteryIndicator(batteryPercentage = batteryPercentage)
             }
+            
             Spacer(modifier = Modifier.height(4.dp))
             ProfileMarker(initials = initials)
             StatusIndicator(status = userStatus)
@@ -639,24 +639,20 @@ private fun FriendMarker(
                 }
             }
             
-            // Show battery and sharing icon for friends
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(MARKER_ELEMENT_SPACING_DP)
-            ) {
-                // Show battery if available
-                friendLocation.location.batteryLevel?.let { batteryLevel ->
-                    if (shouldShowBattery) {
-                        BatteryIndicator(batteryPercentage = batteryLevel)
-                    }
+            // Eye icon above battery for friends
+            Icon(
+                imageVector = Icons.Filled.Visibility,
+                contentDescription = "Friend Location",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(SHARING_ICON_SIZE_DP)
+            )
+            
+            // Show battery if available (below eye icon)
+            friendLocation.location.batteryLevel?.let { batteryLevel ->
+                if (shouldShowBattery) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    BatteryIndicator(batteryPercentage = batteryLevel)
                 }
-                // Sharing icon (always show as visible for friends)
-                Icon(
-                    imageVector = Icons.Filled.Visibility,
-                    contentDescription = "Friend Location",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(SHARING_ICON_SIZE_DP)
-                )
             }
             
             Spacer(modifier = Modifier.height(4.dp))
