@@ -21,6 +21,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null
+
+      - name: Install required Android SDK components
+        run: |
+          sdkmanager "platform-tools" "build-tools;34.0.0" "build-tools;33.0.1"
+
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_HOME" > local.properties
@@ -63,6 +70,13 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null
+
+      - name: Install required Android SDK components
+        run: |
+          sdkmanager "platform-tools" "build-tools;34.0.0" "build-tools;33.0.1" "build-tools;29.0.3"
 
       - name: Create local.properties
         run: |
