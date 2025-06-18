@@ -53,6 +53,11 @@ private data class FriendRow(
     @SerialName("friend_id") val friendId: String
 )
 
+@Serializable
+private data class FriendIdRow(
+    @SerialName("friend_id") val friendId: String
+)
+
 @Singleton
 class SupabaseLocationRepository
 @Inject
@@ -138,12 +143,17 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
             val currentUserId = supabaseClient.auth.currentUserOrNull()?.id 
                 ?: return emptyList()
                 
-            supabaseClient.postgrest["friends"]
+            Log.d(TAG, "Fetching friend IDs for user: $currentUserId")
+            
+            val friendIds = supabaseClient.postgrest["friends"]
                 .select(Columns.list("friend_id")) {
                     filter { eq("user_id", currentUserId) }
                 }
-                .decodeList<FriendRow>()
+                .decodeList<FriendIdRow>()
                 .map { it.friendId }
+                
+            Log.d(TAG, "Found ${friendIds.size} friend IDs: $friendIds")
+            friendIds
         } catch (e: Exception) {
             Log.e(TAG, "Failed to get friend IDs", e)
             emptyList()

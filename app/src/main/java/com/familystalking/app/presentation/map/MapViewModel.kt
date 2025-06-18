@@ -25,7 +25,7 @@ import javax.inject.Inject
 private const val MIN_BATTERY_PERCENTAGE = 0
 private const val MAX_BATTERY_PERCENTAGE = 100
 private const val INITIAL_BATTERY_PERCENTAGE = 100
-private const val LOCATION_SHARING_INTERVAL_MS = 5000L // 5 seconds
+private const val LOCATION_SHARING_INTERVAL_MS = 30000L // 30 seconds
 private const val TAG = "MapViewModel"
 
 @HiltViewModel
@@ -143,19 +143,7 @@ class MapViewModel @Inject constructor(
         observeFriendLocations()
     }
 
-    /**
-     * Manually test location sharing (for debugging)
-     */
-    fun testLocationSharing() {
-        Log.d(TAG, "🧪 Manual location sharing test triggered")
-        viewModelScope.launch {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                shareCurrentLocationToBackend()
-            } else {
-                Log.w(TAG, "Cannot test location sharing - requires Android O or higher")
-            }
-        }
-    }
+
 
     /**
      * Start periodic location sharing job
