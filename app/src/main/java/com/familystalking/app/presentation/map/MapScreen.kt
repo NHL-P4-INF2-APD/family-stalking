@@ -85,6 +85,7 @@ import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.delay
+import kotlin.math.*
 
 private const val TAG = "MapScreen"
 private const val DEFAULT_LATITUDE = 52.3676
@@ -144,6 +145,11 @@ private val BATTERY_INDICATOR_INTERNAL_SPACING_DP: Dp = BATTERY_INDICATOR_INTERN
 private val SHARING_ICON_SIZE_DP: Dp = 18.dp
 private val MARKER_ELEMENT_SPACING_DP: Dp = 4.dp
 
+// Marker clustering/spacing constants
+private const val MARKER_PROXIMITY_THRESHOLD_METERS = 50.0 // Within 50 meters = overlapping
+private const val MARKER_OFFSET_DISTANCE_DEGREES = 0.0002 // ~22 meters offset radius
+private const val MARKER_OFFSET_MULTIPLIER = 1.5 // Spacing between markers in cluster
+
 private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,
     Manifest.permission.ACCESS_COARSE_LOCATION
@@ -160,6 +166,106 @@ private const val MSG_PROVIDER_RE_ENABLED = "Location provider re-enabled."
 private const val MSG_PROVIDER_DISABLED_ALL_OFF = "All device location services disabled."
 private const val MSG_PROVIDER_DISABLED_SOME_OFF = "A location provider was disabled."
 
+// Data classes for marker positioning
+private data class MarkerData(
+    val id: String,
+    val position: LatLng,
+    val type: MarkerType
+)
+
+private sealed class MarkerType {
+    data class User(
+        val batteryPercentage: Int,
+        val userStatus: String,
+        val initials: String,
+        val shouldShowBattery: Boolean,
+        val isSharingLocation: Boolean
+    ) : MarkerType()
+
+    data class Friend(
+        val friendName: String,
+        val initials: String,
+        val friendLocation: com.familystalking.app.domain.model.FamilyMemberLocation,
+        val shouldShowBattery: Boolean
+    ) : MarkerType()
+}
+
+private data class PositionedMarker(
+    val markerData: MarkerData,
+    val adjustedPosition: LatLng
+)
+
+// Helper functions for marker spacing
+private fun calculateDistance(pos1: LatLng, pos2: LatLng): Double {
+    val earthRadius = 6371000.0 // Earth radius in meters
+    val lat1Rad = Math.toRadians(pos1.latitude)
+    val lat2Rad = Math.toRadians(pos2.latitude)
+    val deltaLatRad = Math.toRadians(pos2.latitude - pos1.latitude)
+    val deltaLngRad = Math.toRadians(pos2.longitude - pos1.longitude)
+    
+    val a = sin(deltaLatRad / 2).pow(2) + cos(lat1Rad) * cos(lat2Rad) * sin(deltaLngRad / 2).pow(2)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    return earthRadius * c
+}
+
+private fun groupNearbyMarkers(markers: List<MarkerData>): List<List<MarkerData>> {
+    val groups = mutableListOf<MutableList<MarkerData>>()
+    val processed = mutableSetOf<String>()
+    
+    for (marker in markers) {
+        if (marker.id in processed) continue
+        
+        val group = mutableListOf(marker)
+        processed.add(marker.id)
+        
+        for (otherMarker in markers) {
+            if (otherMarker.id in processed) continue
+            
+            val distance = calculateDistance(marker.position, otherMarker.position)
+            if (distance <= MARKER_PROXIMITY_THRESHOLD_METERS) {
+                group.add(otherMarker)
+                processed.add(otherMarker.id)
+            }
+        }
+        
+        groups.add(group)
+    }
+    
+    return groups
+}
+
+private fun calculateMarkerOffsets(group: List<MarkerData>): List<PositionedMarker> {
+    if (group.size == 1) {
+        return listOf(PositionedMarker(group[0], group[0].position))
+    }
+    
+    val centerLat = group.map { it.position.latitude }.average()
+    val centerLng = group.map { it.position.longitude }.average()
+    
+    return group.mapIndexed { index, marker ->
+        if (group.size == 2) {
+            // For 2 markers, place them on opposite sides
+            val offset = MARKER_OFFSET_DISTANCE_DEGREES * MARKER_OFFSET_MULTIPLIER
+            val adjustedPosition = when (index) {
+                0 -> LatLng(centerLat - offset, centerLng)
+                else -> LatLng(centerLat + offset, centerLng)
+            }
+            PositionedMarker(marker, adjustedPosition)
+        } else {
+            // For 3+ markers, arrange in circle
+            val angleStep = 2 * PI / group.size
+            val angle = angleStep * index
+            val radius = MARKER_OFFSET_DISTANCE_DEGREES * MARKER_OFFSET_MULTIPLIER
+            
+            val offsetLat = centerLat + radius * cos(angle)
+            val offsetLng = centerLng + radius * sin(angle)
+            val adjustedPosition = LatLng(offsetLat, offsetLng)
+            
+            PositionedMarker(marker, adjustedPosition)
+        }
+    }
+}
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -360,31 +466,75 @@ private fun MapArea(
             properties = MapProperties(isMyLocationEnabled = false),
             uiSettings = MapUiSettings(myLocationButtonEnabled = true, zoomControlsEnabled = false)
         ) {
-            // Display user's own marker
+            // Collect all markers
+            val allMarkers = mutableListOf<MarkerData>()
+            
+            // Add user marker if available
             currentMapLatLng?.let { validLatLng ->
-                UserMarker(
-                    position = validLatLng,
-                    batteryPercentage = batteryPercentage,
-                    userStatus = userStatus,
-                    initials = viewModel.getCurrentUserInitials(),
-                    shouldShowBattery = shouldShowBattery,
-                    isSharingLocation = isLocationSharingPreferred
+                allMarkers.add(
+                    MarkerData(
+                        id = "user",
+                        position = validLatLng,
+                        type = MarkerType.User(
+                            batteryPercentage = batteryPercentage,
+                            userStatus = userStatus,
+                            initials = viewModel.getCurrentUserInitials(),
+                            shouldShowBattery = shouldShowBattery,
+                            isSharingLocation = isLocationSharingPreferred
+                        )
+                    )
                 )
             }
             
-            // Display friend markers
+            // Add friend markers
             friendLocations.forEach { friendLocation ->
                 val friendLatLng = LatLng(
                     friendLocation.location.latitude,
                     friendLocation.location.longitude
                 )
-                FriendMarker(
-                    position = friendLatLng,
-                    friendName = friendLocation.name,
-                    initials = viewModel.getFriendInitials(friendLocation.name),
-                    friendLocation = friendLocation,
-                    shouldShowBattery = shouldShowBattery
+                allMarkers.add(
+                    MarkerData(
+                        id = "friend_${friendLocation.userId}",
+                        position = friendLatLng,
+                        type = MarkerType.Friend(
+                            friendName = friendLocation.name,
+                            initials = viewModel.getFriendInitials(friendLocation.name),
+                            friendLocation = friendLocation,
+                            shouldShowBattery = shouldShowBattery
+                        )
+                    )
                 )
+            }
+            
+            // Group nearby markers and calculate offsets
+            val markerGroups = groupNearbyMarkers(allMarkers)
+            val positionedMarkers = markerGroups.flatMap { group ->
+                calculateMarkerOffsets(group)
+            }
+            
+            // Render positioned markers
+            positionedMarkers.forEach { positionedMarker ->
+                when (val markerType = positionedMarker.markerData.type) {
+                    is MarkerType.User -> {
+                        UserMarker(
+                            position = positionedMarker.adjustedPosition,
+                            batteryPercentage = markerType.batteryPercentage,
+                            userStatus = markerType.userStatus,
+                            initials = markerType.initials,
+                            shouldShowBattery = markerType.shouldShowBattery,
+                            isSharingLocation = markerType.isSharingLocation
+                        )
+                    }
+                    is MarkerType.Friend -> {
+                        FriendMarker(
+                            position = positionedMarker.adjustedPosition,
+                            friendName = markerType.friendName,
+                            initials = markerType.initials,
+                            friendLocation = markerType.friendLocation,
+                            shouldShowBattery = markerType.shouldShowBattery
+                        )
+                    }
+                }
             }
         }
     }
