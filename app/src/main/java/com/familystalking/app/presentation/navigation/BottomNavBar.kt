@@ -18,7 +18,7 @@ private val NAV_BAR_HEIGHT = 64.dp
 private val PURE_WHITE = Color(0xFFFFFFFF)
 
 @Composable
-fun bottomNavBar(
+fun BottomNavBar(
     currentRoute: String,
     navController: NavController
 ) {

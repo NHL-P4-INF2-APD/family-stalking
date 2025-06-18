@@ -3,147 +3,166 @@ package com.familystalking.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels // Import for by viewModels()
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.familystalking.app.domain.model.SessionState
 import com.familystalking.app.presentation.MainViewModel
+import com.familystalking.app.presentation.agenda.AddEventScreen
+import com.familystalking.app.presentation.agenda.AgendaScreen
+import com.familystalking.app.presentation.family.CameraScreen
+import com.familystalking.app.presentation.family.FamilyQrScreen
+import com.familystalking.app.presentation.family.FamilyScreen
+import com.familystalking.app.presentation.family.FamilyViewModel // Import FamilyViewModel
+import com.familystalking.app.presentation.family.PendingRequestsScreen
 import com.familystalking.app.presentation.forgotpassword.ForgotPasswordScreen
-import com.familystalking.app.presentation.home.HomeScreen
 import com.familystalking.app.presentation.login.LoginScreen
 import com.familystalking.app.presentation.map.MapScreen
 import com.familystalking.app.presentation.navigation.Screen
-import com.familystalking.app.presentation.settings.settingsScreen
+import com.familystalking.app.presentation.settings.SettingsScreen
 import com.familystalking.app.presentation.signup.SignupScreen
-import com.familystalking.app.presentation.family.FamilyScreen
-import com.familystalking.app.presentation.family.FamilyQrScreen
-import com.familystalking.app.presentation.family.CameraScreen
 import com.familystalking.app.ui.theme.FamilyStalkingTheme
-import com.familystalking.app.ui.theme.PrimaryGreen
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.remember
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.TextButton
-import com.familystalking.app.presentation.family.FamilyViewModel
+import android.util.Log
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    // Test instantiation of FamilyViewModel directly in Activity to isolate Hilt issue
+    private val mainActivityFamilyViewModelInstanceTest: FamilyViewModel by viewModels()
+
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // This log will confirm if Hilt could create FamilyViewModel at Activity level
+        Log.e("MAIN_ACTIVITY_HILT_TEST", "FamilyViewModel instance from by viewModels(): $mainActivityFamilyViewModelInstanceTest")
+
         setContent {
             FamilyStalkingTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val navController = rememberNavController()
-                    val viewModel: MainViewModel = hiltViewModel()
-                    val sessionState by viewModel.sessionState.collectAsState()
-                    val snackbarHostState = remember { SnackbarHostState() }
-                    val familyViewModel: FamilyViewModel = hiltViewModel()
-                    val state by familyViewModel.state.collectAsState()
+                val navController = rememberNavController()
+                val mainViewModel: MainViewModel = hiltViewModel()
+                // FamilyViewModel will be obtained via hiltViewModel() within AppNavHost or screens needing it
+                // We are not directly using mainActivityFamilyViewModelInstanceTest in compose tree here,
+                // its creation is just for the Hilt instantiation test.
 
-                    LaunchedEffect(Unit) {
-                        viewModel.checkSession()
-                    }
+                val sessionState by mainViewModel.sessionState.collectAsState()
+                val snackbarHostState = remember { SnackbarHostState() } // For FamilyViewModel's snackbars if needed globally
 
-                    LaunchedEffect(sessionState) {
+                var determinedStartDestination by remember { mutableStateOf<String?>(null) }
+
+                LaunchedEffect(sessionState) {
+                    if (determinedStartDestination == null) {
                         when (sessionState) {
-                            SessionState.Authenticated -> {
-                                navController.navigate(Screen.Map.route) {
-                                    popUpTo(Screen.Login.route) { inclusive = true }
-                                }
+                            is SessionState.Authenticated -> {
+                                Log.d("MainActivity", "Initial state determined: Authenticated. Setting start destination to Map.")
+                                determinedStartDestination = Screen.Map.route
                             }
-                            SessionState.Unauthenticated -> {
-                                if (navController.currentDestination?.route != Screen.Login.route) {
-                                    navController.navigate(Screen.Login.route) {
-                                        popUpTo(0) { inclusive = true }
-                                    }
-                                }
+                            is SessionState.Unauthenticated -> {
+                                Log.d("MainActivity", "Initial state determined: Unauthenticated. Setting start destination to Login.")
+                                determinedStartDestination = Screen.Login.route
                             }
-                            SessionState.Loading -> { /* Do nothing while loading */ }
-                        }
-                    }
-
-                    NavHost(
-                        navController = navController,
-                        startDestination = Screen.Login.route
-                    ) {
-                        composable(Screen.Login.route) {
-                            LoginScreen(navController)
-                        }
-                        composable(Screen.Signup.route) {
-                            SignupScreen(navController)
-                        }
-                        composable(Screen.ForgotPassword.route) {
-                            ForgotPasswordScreen(navController)
-                        }
-                        composable(Screen.Home.route) {
-                            HomeScreen(navController)
-                        }
-                        composable(Screen.Map.route) {
-                            MapScreen(navController = navController)
-                        }
-                        composable(Screen.Agenda.route) {
-
-                            HomeScreen(navController)
-                        }
-                        composable(Screen.Family.route) {
-                            FamilyScreen(navController)
-                        }
-                        composable(Screen.FamilyQr.route) {
-                            FamilyQrScreen(navController)
-                        }
-                        composable(Screen.Settings.route) {
-                            settingsScreen(navController)
-                        }
-                        composable("camera") {
-                            CameraScreen(navController = navController)
-                        }
-                    }
-
-                    // Global friendship request dialog
-                    state.pendingRequests.forEach { request ->
-                        AlertDialog(
-                            onDismissRequest = { familyViewModel.dismissRequestDialog() },
-                            title = { Text("Friend Request") },
-                            text = { Text("${request.senderId} wants to add you to their family") },
-                            confirmButton = {
-                                Button(
-                                    onClick = { familyViewModel.acceptFriendshipRequest(request.id) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen)
-                                ) {
-                                    Text("Accept")
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { familyViewModel.rejectFriendshipRequest(request.id) }) {
-                                    Text("Reject")
-                                }
+                            is SessionState.Loading -> {
+                                Log.d("MainActivity", "Initial state: Loading session...")
                             }
-                        )
-                    }
-
-                    // Global error snackbar
-                    state.error?.let { error ->
-                        LaunchedEffect(error) {
-                            // Show error snackbar
                         }
                     }
                 }
+
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    if (determinedStartDestination != null) {
+                        AppNavHost(
+                            navController = navController,
+                            startDestination = determinedStartDestination!!,
+                            sessionState = sessionState
+                            // familyViewModel is obtained via hiltViewModel() inside screens that need it
+                        )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CircularProgressIndicator()
+                            Log.d("MainActivity", "Showing loading indicator: startDestination is null.")
+                        }
+                    }
+
+                    // If you have global Snackbars related to FamilyViewModel, you'd collect its state here
+                    // val familyViewModelForSnackbar: FamilyViewModel = hiltViewModel() // Instance for snackbar if truly global
+                    // val familyStateForSnackbar by familyViewModelForSnackbar.state.collectAsState()
+                    // familyStateForSnackbar.error?.let { error -> ... }
+                    // familyStateForSnackbar.successMessage?.let { message -> ... }
+                    // However, it's usually better to scope ViewModels to the composables that use their primary data.
+                }
             }
         }
+    }
+}
+
+@Composable
+fun AppNavHost(
+    navController: NavHostController,
+    startDestination: String,
+    sessionState: SessionState
+    // No FamilyViewModel passed directly, screens will get their own Hilt instance
+) {
+    val currentNavBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentNavBackStackEntry?.destination?.route
+    var hasPerformedInitialNavigation by remember(startDestination) { mutableStateOf(false) }
+
+    LaunchedEffect(startDestination) { // Changed key to startDestination
+        if (!hasPerformedInitialNavigation && startDestination.isNotEmpty()) {
+            Log.d("AppNavHost", "Initial navigation to startDestination: $startDestination")
+            navController.navigate(startDestination) {
+                popUpTo(navController.graph.id) { inclusive = true }
+            }
+            hasPerformedInitialNavigation = true
+        }
+    }
+
+    LaunchedEffect(sessionState, currentRoute, hasPerformedInitialNavigation) {
+        if (hasPerformedInitialNavigation) {
+            val isAuthenticatedScreen = currentRoute != Screen.Login.route &&
+                    currentRoute != Screen.Signup.route &&
+                    currentRoute != Screen.ForgotPassword.route
+
+            if (sessionState is SessionState.Unauthenticated && isAuthenticatedScreen) {
+                Log.d("AppNavHost", "Session Unauthenticated while on an authenticated screen ($currentRoute). Navigating to Login.")
+                navController.navigate(Screen.Login.route) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+        }
+    }
+
+    NavHost(
+        navController = navController,
+        startDestination = startDestination,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        composable(Screen.Login.route) { LoginScreen(navController) }
+        composable(Screen.Signup.route) { SignupScreen(navController) }
+        composable(Screen.ForgotPassword.route) { ForgotPasswordScreen(navController) }
+        composable(Screen.Map.route) { MapScreen(navController = navController) }
+        // FamilyScreen will get its own FamilyViewModel instance via hiltViewModel()
+        composable(Screen.Family.route) { FamilyScreen(navController, hiltViewModel<FamilyViewModel>()) }
+        composable(Screen.FamilyQr.route) { FamilyQrScreen(navController, hiltViewModel<FamilyViewModel>()) }
+        composable(Screen.Camera.route) { CameraScreen(navController, hiltViewModel<FamilyViewModel>()) }
+        composable(Screen.Settings.route) { SettingsScreen(navController) } // Assuming SettingsViewModel if needed
+        composable(Screen.Agenda.route) { AgendaScreen(navController = navController) }
+        composable(Screen.AddEvent.route) { AddEventScreen(navController = navController) }
+        composable(Screen.PendingRequests.route) { PendingRequestsScreen(navController, hiltViewModel<FamilyViewModel>()) }
     }
 }
