@@ -519,7 +519,7 @@ private fun MapArea(
                         UserMarker(
                             position = positionedMarker.adjustedPosition,
                             batteryPercentage = markerType.batteryPercentage,
-                            userStatus = markerType.userStatus,
+                            userStatus = "Myself", // Changed from markerType.userStatus
                             initials = markerType.initials,
                             shouldShowBattery = markerType.shouldShowBattery,
                             isSharingLocation = markerType.isSharingLocation
@@ -623,7 +623,7 @@ private fun FriendMarker(
             // Show time banner if location is stale
             if (friendLocation.isLocationStale()) {
                 Card(
-                    modifier = Modifier.offset(y = (-8).dp),
+                    modifier = Modifier.offset(y = (-32).dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.9f)
                     ),
@@ -649,7 +649,7 @@ private fun FriendMarker(
             
             Spacer(modifier = Modifier.height(4.dp))
             ProfileMarker(initials = initials)
-            StatusIndicator(status = "Friend")
+            StatusIndicator(status = friendName)
         }
     }
 }
