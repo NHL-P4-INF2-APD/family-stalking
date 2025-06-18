@@ -10,11 +10,13 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -159,6 +161,7 @@ private const val MSG_PROVIDER_DISABLED_ALL_OFF = "All device location services 
 private const val MSG_PROVIDER_DISABLED_SOME_OFF = "A location provider was disabled."
 
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MapScreen(
     navController: NavController,
@@ -170,6 +173,8 @@ fun MapScreen(
     val userStatus by viewModel.userStatus.collectAsStateWithLifecycle()
     val shouldShowBatteryOnMap by viewModel.shouldShowBatteryOnMap.collectAsStateWithLifecycle()
     val isLocationSharingPreferred by viewModel.isLocationSharingPreferred.collectAsStateWithLifecycle()
+    val friendLocations by viewModel.friendLocations.collectAsStateWithLifecycle()
+    val isLoadingFriends by viewModel.isLoadingFriends.collectAsStateWithLifecycle()
 
     var locationPermissionGrantedState by remember { mutableStateOf(false) }
     var showPermissionRationaleDialog by remember { mutableStateOf(false) }
@@ -215,7 +220,13 @@ fun MapScreen(
         // isLocationSharingPreferredSetting is NO LONGER passed here.
         // The effect's job is to get location if permissions are met for local display.
         // ViewModel handles backend sharing based on the preference.
-        onLocationUpdate = { newLocation -> viewModel.updateLocation(newLocation) },
+        onLocationUpdate = { newLocation -> 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                viewModel.updateLocation(newLocation)
+            } else {
+                viewModel.updateLocation(newLocation)
+            }
+        },
         onUiMessage = { message -> uiMessage = message },
         onShowLocationDisabledAlert = { showLocationDisabledAlert = it }
     )
@@ -241,7 +252,9 @@ fun MapScreen(
             batteryPercentage = batteryPercentage,
             userStatus = userStatus,
             shouldShowBattery = shouldShowBatteryOnMap,
-            isLocationSharingPreferred = isLocationSharingPreferred // For marker icon
+            isLocationSharingPreferred = isLocationSharingPreferred, // For marker icon
+            friendLocations = friendLocations,
+            viewModel = viewModel
         )
         BottomNavBar(navController = navController, currentRoute = "map")
     }
@@ -330,7 +343,9 @@ private fun MapArea(
     batteryPercentage: Int,
     userStatus: String,
     shouldShowBattery: Boolean,
-    isLocationSharingPreferred: Boolean
+    isLocationSharingPreferred: Boolean,
+    friendLocations: List<com.familystalking.app.domain.model.FamilyMemberLocation>,
+    viewModel: MapViewModel
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         val cameraPositionState = rememberCameraPositionState {
@@ -346,6 +361,7 @@ private fun MapArea(
             properties = MapProperties(isMyLocationEnabled = false),
             uiSettings = MapUiSettings(myLocationButtonEnabled = true, zoomControlsEnabled = false)
         ) {
+            // Display user's own marker
             currentMapLatLng?.let { validLatLng ->
                 UserMarker(
                     position = validLatLng,
@@ -354,6 +370,21 @@ private fun MapArea(
                     initials = "OP",
                     shouldShowBattery = shouldShowBattery,
                     isSharingLocation = isLocationSharingPreferred
+                )
+            }
+            
+            // Display friend markers
+            friendLocations.forEach { friendLocation ->
+                val friendLatLng = LatLng(
+                    friendLocation.location.latitude,
+                    friendLocation.location.longitude
+                )
+                FriendMarker(
+                    position = friendLatLng,
+                    friendName = friendLocation.name,
+                    initials = viewModel.getFriendInitials(friendLocation.name),
+                    friendLocation = friendLocation,
+                    shouldShowBattery = shouldShowBattery
                 )
             }
         }
@@ -422,6 +453,54 @@ private fun UserMarker(
             Spacer(modifier = Modifier.height(4.dp))
             ProfileMarker(initials = initials)
             StatusIndicator(status = userStatus)
+        }
+    }
+}
+
+@Composable
+private fun FriendMarker(
+    position: LatLng,
+    friendName: String,
+    initials: String,
+    friendLocation: com.familystalking.app.domain.model.FamilyMemberLocation,
+    shouldShowBattery: Boolean
+) {
+    MarkerComposable(
+        keys = arrayOf(friendName, position, friendLocation.location.timestamp),
+        state = MarkerState(position = position),
+        anchor = Offset(MARKER_ANCHOR_X, MARKER_ANCHOR_Y)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Show time banner if location is stale
+            if (friendLocation.isLocationStale()) {
+                Card(
+                    modifier = Modifier.offset(y = (-8).dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.9f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Text(
+                        text = friendLocation.getFormattedTimeSinceUpdate(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+            
+            // Sharing icon (always show as visible for friends)
+            Icon(
+                imageVector = Icons.Filled.Visibility,
+                contentDescription = "Friend Location",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(SHARING_ICON_SIZE_DP)
+            )
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            ProfileMarker(initials = initials)
+            StatusIndicator(status = "Friend")
         }
     }
 }
