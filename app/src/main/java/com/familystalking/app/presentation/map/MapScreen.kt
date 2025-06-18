@@ -174,7 +174,6 @@ fun MapScreen(
     val shouldShowBatteryOnMap by viewModel.shouldShowBatteryOnMap.collectAsStateWithLifecycle()
     val isLocationSharingPreferred by viewModel.isLocationSharingPreferred.collectAsStateWithLifecycle()
     val friendLocations by viewModel.friendLocations.collectAsStateWithLifecycle()
-    val isLoadingFriends by viewModel.isLoadingFriends.collectAsStateWithLifecycle()
 
     var locationPermissionGrantedState by remember { mutableStateOf(false) }
     var showPermissionRationaleDialog by remember { mutableStateOf(false) }
@@ -367,7 +366,7 @@ private fun MapArea(
                     position = validLatLng,
                     batteryPercentage = batteryPercentage,
                     userStatus = userStatus,
-                    initials = "OP",
+                    initials = viewModel.getCurrentUserInitials(),
                     shouldShowBattery = shouldShowBattery,
                     isSharingLocation = isLocationSharingPreferred
                 )

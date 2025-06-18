@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.familystalking.app.data.datastore.SettingsDataStore
 import com.familystalking.app.domain.model.FamilyMemberLocation
+import com.familystalking.app.domain.repository.FamilyRepository
 import com.familystalking.app.domain.repository.LocationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +16,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -28,7 +28,8 @@ private const val TAG = "MapViewModel"
 @HiltViewModel
 class MapViewModel @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val familyRepository: FamilyRepository
 ) : ViewModel() {
 
     private val _userLocation = MutableStateFlow<Location?>(null)
@@ -45,6 +46,9 @@ class MapViewModel @Inject constructor(
 
     private val _isLoadingFriends = MutableStateFlow(false)
     val isLoadingFriends: StateFlow<Boolean> = _isLoadingFriends.asStateFlow()
+
+    private val _currentUserName = MutableStateFlow<String>("User")
+    val currentUserName: StateFlow<String> = _currentUserName.asStateFlow()
 
     val shouldShowBatteryOnMap: StateFlow<Boolean> = settingsDataStore.showBatteryPercentagePreference
         .stateIn(
@@ -63,6 +67,21 @@ class MapViewModel @Inject constructor(
     init {
         // Start collecting friend locations with real-time updates
         observeFriendLocations()
+        // Get current user's name
+        getCurrentUser()
+    }
+
+    private fun getCurrentUser() {
+        viewModelScope.launch {
+            try {
+                val currentUser = familyRepository.getCurrentUser()
+                _currentUserName.value = currentUser.name
+                Log.d(TAG, "Current user name: ${currentUser.name}")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get current user", e)
+                _currentUserName.value = "User"
+            }
+        }
     }
 
     private fun observeFriendLocations() {
@@ -122,13 +141,52 @@ class MapViewModel @Inject constructor(
     }
 
     /**
-     * Get a specific friend's initials for display
+     * Generate initials based on a person's name
+     * Rules:
+     * - If first and last name: use first letter of each
+     * - If has middle name: use first and last (skip middle)
+     * - If only first name: use first 2 letters of first name
+     * - Fallback: "?" for empty/invalid names
+     */
+    fun getInitials(fullName: String): String {
+        val cleanName = fullName.trim()
+        if (cleanName.isEmpty()) return "?"
+
+        val nameParts = cleanName.split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        
+        return when (nameParts.size) {
+            0 -> "?"
+            1 -> {
+                // Only first name - use first 2 letters
+                val firstName = nameParts[0]
+                if (firstName.length >= 2) {
+                    firstName.take(2).uppercase()
+                } else {
+                    firstName.uppercase().padEnd(2, '?')
+                }
+            }
+            2 -> {
+                // First and last name
+                "${nameParts[0].first().uppercaseChar()}${nameParts[1].first().uppercaseChar()}"
+            }
+            else -> {
+                // Has middle name(s) - use first and last
+                "${nameParts.first().first().uppercaseChar()}${nameParts.last().first().uppercaseChar()}"
+            }
+        }
+    }
+
+    /**
+     * Get initials for the current user
+     */
+    fun getCurrentUserInitials(): String {
+        return getInitials(currentUserName.value)
+    }
+
+    /**
+     * Get initials for a friend (backward compatibility)
      */
     fun getFriendInitials(friendName: String): String {
-        return friendName.split(" ")
-            .mapNotNull { it.firstOrNull()?.uppercaseChar() }
-            .take(2)
-            .joinToString("")
-            .ifEmpty { "?" }
+        return getInitials(friendName)
     }
 }
