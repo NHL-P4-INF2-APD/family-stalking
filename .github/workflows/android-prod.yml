@@ -54,8 +54,57 @@ jobs:
             app/build/reports/jacoco/coverage/
           if-no-files-found: warn
 
-  build-and-release:
+  auto-tag:
     needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.generate_version.outputs.new_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag
+        id: get_latest_tag
+        run: |
+          # Get the latest tag, default to v1.0.0 if none exists
+          git fetch --tags
+          latest_tag=$(git tag --sort=-v:refname | head -n 1)
+          if [ -z "$latest_tag" ]; then
+            latest_tag="v1.0.0"
+          fi
+          echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+
+      - name: Generate new version
+        id: generate_version
+        run: |
+          latest_tag=${{ steps.get_latest_tag.outputs.latest_tag }}
+          # Remove 'v' prefix
+          version=${latest_tag#v}
+          # Split into major, minor, patch
+          IFS='.' read -r major minor patch <<< "$version"
+          # Increment patch version
+          if [ -z "$patch" ]; then
+            new_version="v1.0.1"
+          else
+            new_patch=$((patch + 1))
+            new_version="v$major.$minor.$new_patch"
+          fi
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Create and push new tag
+        run: |
+          new_version=${{ steps.generate_version.outputs.new_version }}
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag $new_version
+          git push origin $new_version
+
+  build-and-release:
+    needs: [test, auto-tag]
+    if: always() && needs.test.result == 'success' && (needs.auto-tag.result == 'success' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -96,13 +145,6 @@ jobs:
           keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
 
-      - name: List APK files for debugging
-        run: |
-          echo "Listing APK output directory:"
-          ls -la app/build/outputs/apk/release/ || echo "Release directory not found"
-          echo "Searching for APK files:"
-          find app/build/outputs/ -name "*.apk" -type f || echo "No APK files found"
-
       - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
@@ -111,10 +153,11 @@ jobs:
           if-no-files-found: error
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: needs.auto-tag.result == 'success' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
           files: app/build/outputs/apk/release/*.apk
-          generate_release_notes: true # This line enables auto-generation
+          generate_release_notes: true
           draft: false
           prerelease: false
+          tag_name: ${{ needs.auto-tag.outputs.new_version || github.ref_name }}
