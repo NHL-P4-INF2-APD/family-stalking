@@ -24,7 +24,7 @@ import javax.inject.Singleton
 
 @Serializable
 private data class LocationRow(
-    @SerialName("user_id") @Contextual val userId: UUID,
+    @SerialName("user_id") val userId: String,
     val latitude: Double,
     val longitude: Double,
     val timestamp: String,
@@ -33,7 +33,7 @@ private data class LocationRow(
     fun toDomain() =
         Location(
             id = UUID.randomUUID(),
-            userId = userId,
+            userId = UUID.fromString(userId),
             latitude = latitude,
             longitude = longitude,
             timestamp = Instant.parse(timestamp),
@@ -42,7 +42,7 @@ private data class LocationRow(
 
 @Serializable
 private data class ProfileRow(
-    @Contextual val id: UUID,
+    val id: String,
     val name: String,
     val username: String? = null,
 )
@@ -68,23 +68,30 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
         longitude: Double,
     ) {
         try {
-            val userId =
-                supabaseClient.auth.currentUserOrNull()?.id?.let {
-                    UUID.fromString(it)
-                }
-                    ?: throw IllegalStateException("User must be authenticated")
+            Log.d(TAG, "🔄 updateUserLocation called with lat=$latitude, lng=$longitude")
+            
+            val currentUser = supabaseClient.auth.currentUserOrNull()
+            Log.d(TAG, "Current user from Supabase: ${currentUser?.id}")
+            
+            val userId = currentUser?.id
+            if (userId == null) {
+                Log.e(TAG, "❌ User must be authenticated")
+                return
+            }
 
-            supabaseClient.postgrest["locations"].insert(
-                LocationRow(
-                    userId = userId,
-                    latitude = latitude,
-                    longitude = longitude,
-                    timestamp = Instant.now().toString(),
-                ),
+            val locationRow = LocationRow(
+                userId = userId,
+                latitude = latitude,
+                longitude = longitude,
+                timestamp = Instant.now().toString(),
             )
-            Log.d(TAG, "Location updated successfully for user: $userId")
+            
+            Log.d(TAG, "Inserting location row: $locationRow")
+            
+            supabaseClient.postgrest["locations"].insert(locationRow)
+            Log.d(TAG, "✅ Location updated successfully for user: $userId")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to update location", e)
+            Log.e(TAG, "❌ Failed to update location", e)
             throw e
         }
     }
@@ -107,11 +114,11 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
         }
     }
 
-    private suspend fun getFamilyMemberName(userId: UUID): String {
+    private suspend fun getFamilyMemberName(userId: String): String {
         return try {
             supabaseClient.postgrest["profiles"]
                 .select(Columns.list("id", "name", "username")) {
-                    filter { eq("id", userId.toString()) }
+                    filter { eq("id", userId) }
                 }
                 .decodeList<ProfileRow>()
                 .firstOrNull()
@@ -162,7 +169,7 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
                     supabaseClient.postgrest["locations"]
                         .select(Columns.list("user_id", "latitude", "longitude", "timestamp")) {
                             filter {
-                                isIn("user_id", friendIds.map { UUID.fromString(it).toString() })
+                                isIn("user_id", friendIds)
                             }
                             order("timestamp", Order.DESCENDING)
                         }
@@ -172,7 +179,7 @@ constructor(private val supabaseClient: SupabaseClient) : LocationRepository {
                             val latestLocation = locations.maxByOrNull { Instant.parse(it.timestamp) }
                             latestLocation?.let {
                                 FamilyMemberLocation(
-                                    userId = userId,
+                                    userId = UUID.fromString(userId),
                                     name = getFamilyMemberName(userId),
                                     location = it.toDomain()
                                 )

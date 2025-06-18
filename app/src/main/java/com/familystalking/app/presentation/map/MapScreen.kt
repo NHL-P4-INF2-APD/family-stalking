@@ -244,6 +244,13 @@ fun MapScreen(
         if (uiMessage.isNotBlank()) {
             UiMessageBar(uiMessage = uiMessage)
         }
+        // Debug button for testing
+        androidx.compose.material3.Button(
+            onClick = { viewModel.testLocationSharing() },
+            modifier = Modifier.fillMaxWidth().padding(8.dp)
+        ) {
+            androidx.compose.material3.Text("🧪 Test Location Sharing")
+        }
         MapArea(
             modifier = Modifier.weight(1f),
             currentMapLatLng = currentMapLatLng,

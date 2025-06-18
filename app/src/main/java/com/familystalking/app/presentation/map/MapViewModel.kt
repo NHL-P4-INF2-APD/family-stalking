@@ -70,12 +70,20 @@ class MapViewModel @Inject constructor(
         )
 
     init {
+        Log.d(TAG, "🚀 MapViewModel initialized")
+        
         // Start collecting friend locations with real-time updates
         observeFriendLocations()
         // Get current user's name
         getCurrentUser()
         // Start periodic location sharing
         startLocationSharingJob()
+        
+        // Log initial state
+        viewModelScope.launch {
+            delay(1000) // Wait a moment for initial values
+            Log.d(TAG, "📊 Initial state - Location sharing enabled: ${isLocationSharingPreferred.value}, User location: ${_userLocation.value}")
+        }
     }
 
     private fun getCurrentUser() {
@@ -113,7 +121,11 @@ class MapViewModel @Inject constructor(
     @RequiresApi(Build.VERSION_CODES.O)
     fun updateLocation(location: Location?) {
         _userLocation.value = location // Always update local display for the user
-        Log.d(TAG, "Location updated: ${location?.latitude}, ${location?.longitude}")
+        if (location != null) {
+            Log.d(TAG, "📍 Location updated: lat=${location.latitude}, lng=${location.longitude}, provider=${location.provider}, accuracy=${location.accuracy}m, time=${location.time}")
+        } else {
+            Log.w(TAG, "⚠️ Location updated with NULL value")
+        }
     }
 
     fun updateBatteryPercentage(percentage: Int) {
@@ -132,18 +144,43 @@ class MapViewModel @Inject constructor(
     }
 
     /**
+     * Manually test location sharing (for debugging)
+     */
+    fun testLocationSharing() {
+        Log.d(TAG, "🧪 Manual location sharing test triggered")
+        viewModelScope.launch {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                shareCurrentLocationToBackend()
+            } else {
+                Log.w(TAG, "Cannot test location sharing - requires Android O or higher")
+            }
+        }
+    }
+
+    /**
      * Start periodic location sharing job
      */
     private fun startLocationSharingJob() {
         locationSharingJob?.cancel() // Cancel any existing job
         locationSharingJob = viewModelScope.launch {
+            Log.d(TAG, "Location sharing job coroutine started")
+            
+            // First, wait a bit for location to be obtained
+            delay(2000) // Wait 2 seconds before first attempt
+            
             while (true) {
-                delay(LOCATION_SHARING_INTERVAL_MS)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    shareCurrentLocationToBackend()
-                } else {
-                    Log.w(TAG, "Location sharing requires Android O or higher")
+                try {
+                    Log.d(TAG, "Location sharing job iteration - Android version: ${Build.VERSION.SDK_INT}")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        shareCurrentLocationToBackend()
+                    } else {
+                        Log.w(TAG, "Location sharing requires Android O or higher")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception in location sharing job", e)
                 }
+                
+                delay(LOCATION_SHARING_INTERVAL_MS)
             }
         }
         Log.d(TAG, "Location sharing job started - will share location every ${LOCATION_SHARING_INTERVAL_MS / 1000} seconds")
@@ -157,26 +194,33 @@ class MapViewModel @Inject constructor(
         val currentLocation = _userLocation.value
         val isSharingEnabled = isLocationSharingPreferred.value
         
-        Log.d(TAG, "Attempting to share location - Location available: ${currentLocation != null}, Sharing enabled: $isSharingEnabled")
+        Log.d(TAG, "=== LOCATION SHARING ATTEMPT ===")
+        Log.d(TAG, "Location available: ${currentLocation != null}")
+        if (currentLocation != null) {
+            Log.d(TAG, "Location details: lat=${currentLocation.latitude}, lng=${currentLocation.longitude}, provider=${currentLocation.provider}, accuracy=${currentLocation.accuracy}")
+        }
+        Log.d(TAG, "Sharing enabled: $isSharingEnabled")
         
         if (isSharingEnabled && currentLocation != null) {
             try {
+                Log.d(TAG, "Calling locationRepository.updateUserLocation...")
                 locationRepository.updateUserLocation(
                     latitude = currentLocation.latitude,
                     longitude = currentLocation.longitude
                 )
-                Log.d(TAG, "Location shared successfully to backend: ${currentLocation.latitude}, ${currentLocation.longitude}")
+                Log.d(TAG, "✅ Location shared successfully to backend: ${currentLocation.latitude}, ${currentLocation.longitude}")
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to share location to backend", e)
+                Log.e(TAG, "❌ Failed to share location to backend", e)
             }
         } else {
             if (!isSharingEnabled) {
-                Log.d(TAG, "Location sharing is disabled in settings")
+                Log.w(TAG, "⚠️ Location sharing is disabled in settings")
             }
             if (currentLocation == null) {
-                Log.d(TAG, "No current location available to share")
+                Log.w(TAG, "⚠️ No current location available to share")
             }
         }
+        Log.d(TAG, "=== END LOCATION SHARING ATTEMPT ===")
     }
 
     /**
