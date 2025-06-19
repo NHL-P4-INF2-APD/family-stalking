@@ -3,6 +3,7 @@ package com.familystalking.app.data.repository
 import com.familystalking.app.domain.model.Event
 import com.familystalking.app.domain.model.EventAttendee
 import com.familystalking.app.domain.repository.AgendaRepository
+import com.familystalking.app.domain.repository.FamilyRepository
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.from
@@ -34,7 +35,8 @@ data class EventAttendeeRow(
 )
 
 class AgendaRepositoryImpl @Inject constructor(
-    private val supabaseClient: SupabaseClient
+    private val supabaseClient: SupabaseClient,
+    private val familyRepository: FamilyRepository
 ) : AgendaRepository {
     override suspend fun getEventsForUser(userId: String): List<Event> {
         println("[DEBUG] getEventsForUser called for userId: $userId")
@@ -124,13 +126,33 @@ class AgendaRepositoryImpl @Inject constructor(
         val attendeeRows = supabaseClient.from("event_attendees").select {
             filter { eq("event_id", eventId) }
         }.decodeList<EventAttendeeRow>()
-        // Gebruik userId als naam (geen extra query)
-        return attendeeRows.map { row ->
-            EventAttendee(
-                eventId = row.eventId,
-                userId = row.userId,
-                name = row.userId // Toon userId als naam
+        // Haal family members op en maak een map van userId naar gebruikersnaam
+        val familyMembers = familyRepository.getFamilyMembers()
+        val userIdToName = familyMembers.associate { it.id to it.name }
+        val attendees = attendeeRows.mapNotNull { row ->
+            val name = userIdToName[row.userId]
+            if (name != null) {
+                EventAttendee(
+                    eventId = row.eventId,
+                    userId = row.userId,
+                    name = name
+                )
+            } else {
+                null
+            }
+        }.toMutableList()
+        // Voeg de huidige gebruiker toe als deze nog niet in de lijst zit
+        val currentUser = familyRepository.getCurrentUser()
+        val alreadyInList = attendees.any { it.userId == currentUser.id }
+        if (!alreadyInList && attendeeRows.any { it.userId == currentUser.id }) {
+            attendees.add(
+                EventAttendee(
+                    eventId = eventId,
+                    userId = currentUser.id ?: "",
+                    name = currentUser.name
+                )
             )
         }
+        return attendees
     }
 } 
