@@ -15,12 +15,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.familystalking.app.domain.model.Event
 import com.familystalking.app.presentation.navigation.Screen
 import com.familystalking.app.presentation.navigation.BottomNavBar
@@ -79,35 +82,28 @@ fun AgendaScreen(
                 .padding(paddingValues)
                 .padding(horizontal = GLOBAL_PADDING, vertical = VERTICAL_ITEM_SPACING)
         ) {
-            // RELOAD BUTTON
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+            SwipeRefreshList(
+                isLoading = loading,
+                onRefresh = { viewModel.fetchAgendaItems() },
+                modifier = Modifier.weight(1f)
             ) {
-                Button(
-                    onClick = { viewModel.fetchAgendaItems() },
-                    enabled = !loading
-                ) {
-                    Text("Reload")
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            if (agendaItems.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("No agenda items yet.", style = MaterialTheme.typography.bodyLarge)
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(VERTICAL_ITEM_SPACING)
-                ) {
-                    items(agendaItems, key = { it.id }) { item ->
-                        AgendaItemCard(
-                            item = item,
-                            onClick = { viewModel.onAgendaItemClick(item) }
-                        )
+                if (agendaItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No agenda items yet.\nPull down to refresh.", style = MaterialTheme.typography.bodyLarge)
+                    }
+                } else {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(VERTICAL_ITEM_SPACING)
+                    ) {
+                        items(agendaItems, key = { it.id }) { item ->
+                            AgendaItemCard(
+                                item = item,
+                                onClick = { viewModel.onAgendaItemClick(item) }
+                            )
+                        }
                     }
                 }
             }
@@ -300,5 +296,36 @@ fun TimePickerDialog( // Keep this utility if used by AddEventScreen's date/time
         confirmButton = confirmButton,
         dismissButton = dismissButton,
         modifier = Modifier.fillMaxWidth(0.9f)
+    )
+}
+
+@Composable
+fun SwipeRefreshList(
+    isLoading: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            SwipeRefreshLayout(context).apply {
+                setOnRefreshListener {
+                    onRefresh()
+                }
+
+                val composeView = ComposeView(context).apply {
+                    setContent {
+                        MaterialTheme {
+                            content()
+                        }
+                    }
+                }
+                addView(composeView)
+            }
+        },
+        update = { swipeRefreshLayout ->
+            swipeRefreshLayout.isRefreshing = isLoading
+        }
     )
 }
