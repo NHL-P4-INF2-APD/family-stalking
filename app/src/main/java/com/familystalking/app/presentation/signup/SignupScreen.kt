@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -45,6 +44,7 @@ fun SignupScreen(
     viewModel: SignupViewModel = hiltViewModel()
 ) {
     val email by viewModel.email.collectAsState()
+    val username by viewModel.username.collectAsState()
     val password by viewModel.password.collectAsState()
     val confirmPassword by viewModel.confirmPassword.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -68,7 +68,7 @@ fun SignupScreen(
         verticalArrangement = Arrangement.Top
     ) {
         Spacer(modifier = Modifier.height(64.dp))
-        
+
         Surface(
             modifier = Modifier
                 .size(120.dp)
@@ -117,6 +117,22 @@ fun SignupScreen(
                 imeAction = ImeAction.Next
             ),
             isError = error is AuthError.InvalidEmail || error is AuthError.EmailAlreadyInUse
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = username,
+            onValueChange = { viewModel.onUsernameChange(it) },
+            label = { Text("Username") },
+            singleLine = true,
+            shape = RoundedCornerShape(8.dp),
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            ),
+            isError = error is AuthError.InvalidUsername
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -188,4 +204,4 @@ fun SignupScreen(
             }
         }
     }
-} 
+}

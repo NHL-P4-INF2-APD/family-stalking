@@ -21,6 +21,9 @@ class SignupViewModel @Inject constructor(
     private val _email = MutableStateFlow("")
     val email: StateFlow<String> = _email.asStateFlow()
 
+    private val _username = MutableStateFlow("")
+    val username: StateFlow<String> = _username.asStateFlow()
+
     private val _password = MutableStateFlow("")
     val password: StateFlow<String> = _password.asStateFlow()
 
@@ -41,6 +44,11 @@ class SignupViewModel @Inject constructor(
         clearError()
     }
 
+    fun onUsernameChange(username: String) {
+        _username.value = username
+        clearError()
+    }
+
     fun onPasswordChange(password: String) {
         _password.value = password
         clearError()
@@ -58,7 +66,7 @@ class SignupViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
 
-            when (val result = authenticationRepository.signUp(_email.value, _password.value)) {
+            when (val result = authenticationRepository.signUp(_email.value, _password.value, _username.value)) {
                 is AuthResult.Success -> {
                     _isLoading.value = false
                     _navigateTo.value = Screen.Map.route
@@ -75,6 +83,10 @@ class SignupViewModel @Inject constructor(
         return when {
             _email.value.isBlank() -> {
                 _error.value = AuthError.InvalidEmail
+                false
+            }
+            _username.value.isBlank() -> {
+                _error.value = AuthError.InvalidUsername
                 false
             }
             _password.value.length < 6 -> {

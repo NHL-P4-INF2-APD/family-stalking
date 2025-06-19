@@ -8,4 +8,5 @@ sealed class AuthError(val message: String) {
     object InvalidCredentials : AuthError("Invalid email or password")
     object NetworkError : AuthError("Network error occurred")
     object UnknownError : AuthError("An unknown error occurred")
+    object InvalidUsername : AuthError("Username cannot be empty.")
 } 
