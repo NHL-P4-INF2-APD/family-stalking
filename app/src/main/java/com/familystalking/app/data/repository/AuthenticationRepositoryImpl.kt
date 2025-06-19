@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,21 +57,20 @@ class AuthenticationRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun signUp(email: String, password: String): AuthResult {
+    override suspend fun signUp(email: String, password: String, username: String): AuthResult {
         return try {
-            val response = supabaseClient.auth.signUpWith(Email) {
+            supabaseClient.auth.signUpWith(Email) {
                 this.email = email
                 this.password = password
+                this.data = buildJsonObject {
+                    put("username", username)
+                }
             }
-            if (response?.id != null) {
-                Log.i("AuthRepoImpl", "signUp successful for $email, user ID: ${response.id}")
-                AuthResult.Success
-            } else {
-                Log.w("AuthRepoImpl", "signUp returned null or no ID for $email")
-                AuthResult.Error(AuthError.UnknownError)
-            }
+            Log.i("AuthRepoImpl", "signUp call completed successfully for $email. User created, pending email confirmation.")
+            AuthResult.Success
+
         } catch (e: Exception) {
-            Log.e("AuthRepoImpl", "signUp failed", e)
+            Log.e("AuthRepoImpl", "signUp failed with an exception", e)
             when {
                 e.message?.contains("User already registered", ignoreCase = true) == true ||
                         e.message?.contains("already_exists", ignoreCase = true) == true -> {
