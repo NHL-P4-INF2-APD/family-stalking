@@ -7,7 +7,9 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Columns
-import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
@@ -47,7 +49,7 @@ class AgendaRepositoryImpl @Inject constructor(
             return emptyList()
         }
         
-        println("[DEBUG] Found ${attendeeRows.size} attendee rows")
+        println("[DEBUG] Found ${attendeeRows.size} attendee rows: $attendeeRows")
         val calendarIds = attendeeRows.map { it.eventId }
         println("[DEBUG] Calendar IDs to lookup: $calendarIds")
         
@@ -66,16 +68,19 @@ class AgendaRepositoryImpl @Inject constructor(
             return emptyList()
         }
         
-        println("[DEBUG] Found ${eventRows.size} event rows")
+        println("[DEBUG] Found ${eventRows.size} event rows: $eventRows")
         
         return eventRows.map { row ->
             val attendees = getEventAttendees(row.calendarId)
+            println("[DEBUG] Event ${row.calendarId} heeft ${attendees.size} attendees: $attendees")
+            val startTime = Instant.parse(row.startTime).toLocalDateTime(TimeZone.currentSystemDefault())
+            val endTime = Instant.parse(row.endTime).toLocalDateTime(TimeZone.currentSystemDefault())
             Event(
                 id = row.calendarId,
                 title = row.title,
                 description = row.description,
-                startTime = LocalDateTime.parse(row.startTime),
-                endTime = LocalDateTime.parse(row.endTime),
+                startTime = startTime,
+                endTime = endTime,
                 location = row.location,
                 createdBy = row.createdBy,
                 participants = attendees.map { it.name }
@@ -89,7 +94,7 @@ class AgendaRepositoryImpl @Inject constructor(
             val eventInsertResponse = supabaseClient.from("calendar_events").insert(
                 CalendarEventRow(
                     calendarId = event.id,
-                    familyId = null, // optioneel, afhankelijk van je app
+                    familyId = null,
                     title = event.title,
                     description = event.description,
                     startTime = event.startTime.toString(),
@@ -119,24 +124,13 @@ class AgendaRepositoryImpl @Inject constructor(
         val attendeeRows = supabaseClient.from("event_attendees").select {
             filter { eq("event_id", eventId) }
         }.decodeList<EventAttendeeRow>()
-        // Haal e-mail op voor elke user_id en maak naam
+        // Gebruik userId als naam (geen extra query)
         return attendeeRows.map { row ->
-            val userEmail = getUserEmail(row.userId)
-            val name = userEmail?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Onbekend"
             EventAttendee(
                 eventId = row.eventId,
                 userId = row.userId,
-                name = name
+                name = row.userId // Toon userId als naam
             )
         }
-    }
-
-    override suspend fun getUserEmail(userId: String): String? {
-        // Haal e-mail op uit users tabel
-        val users = supabaseClient.from("users").select {
-            filter { eq("user_id", userId) }
-        }.data
-        val user = users.firstOrNull() as? Map<*, *>
-        return user?.get("email") as? String
     }
 } 
