@@ -8,6 +8,8 @@ import com.familystalking.app.data.repository.FamilyRepositoryImpl
 import com.familystalking.app.domain.repository.FamilyRepository
 import com.familystalking.app.data.repository.AgendaRepositoryImpl
 import com.familystalking.app.domain.repository.AgendaRepository
+import com.familystalking.app.data.repository.SupabaseLocationRepository
+import com.familystalking.app.domain.repository.LocationRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -41,4 +43,7 @@ abstract class RepositoryModule {
     abstract fun bindAgendaRepository(
         agendaRepositoryImpl: AgendaRepositoryImpl
     ): AgendaRepository
+    abstract fun bindLocationRepository(
+        supabaseLocationRepository: SupabaseLocationRepository
+    ): LocationRepository
 }

@@ -9,7 +9,7 @@ interface LocationRepository {
     /**
      * Updates the current user's location
      */
-    suspend fun updateUserLocation(latitude: Double, longitude: Double)
+    suspend fun updateUserLocation(latitude: Double, longitude: Double, batteryLevel: Int? = null)
 
     /**
      * Gets the latest location for a specific user

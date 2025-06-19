@@ -10,11 +10,13 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -83,6 +85,7 @@ import com.google.maps.android.compose.MarkerComposable
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import kotlinx.coroutines.delay
+import kotlin.math.*
 
 private const val TAG = "MapScreen"
 private const val DEFAULT_LATITUDE = 52.3676
@@ -142,6 +145,11 @@ private val BATTERY_INDICATOR_INTERNAL_SPACING_DP: Dp = BATTERY_INDICATOR_INTERN
 private val SHARING_ICON_SIZE_DP: Dp = 18.dp
 private val MARKER_ELEMENT_SPACING_DP: Dp = 4.dp
 
+// Marker clustering/spacing constants
+private const val MARKER_PROXIMITY_THRESHOLD_METERS = 50.0 // Within 50 meters = overlapping
+private const val MARKER_OFFSET_DISTANCE_DEGREES = 0.0002 // ~22 meters offset radius
+private const val MARKER_OFFSET_MULTIPLIER = 1.5 // Spacing between markers in cluster
+
 private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,
     Manifest.permission.ACCESS_COARSE_LOCATION
@@ -158,7 +166,108 @@ private const val MSG_PROVIDER_RE_ENABLED = "Location provider re-enabled."
 private const val MSG_PROVIDER_DISABLED_ALL_OFF = "All device location services disabled."
 private const val MSG_PROVIDER_DISABLED_SOME_OFF = "A location provider was disabled."
 
+// Data classes for marker positioning
+private data class MarkerData(
+    val id: String,
+    val position: LatLng,
+    val type: MarkerType
+)
 
+private sealed class MarkerType {
+    data class User(
+        val batteryPercentage: Int,
+        val userStatus: String,
+        val initials: String,
+        val shouldShowBattery: Boolean,
+        val isSharingLocation: Boolean
+    ) : MarkerType()
+
+    data class Friend(
+        val friendName: String,
+        val initials: String,
+        val friendLocation: com.familystalking.app.domain.model.FamilyMemberLocation,
+        val shouldShowBattery: Boolean
+    ) : MarkerType()
+}
+
+private data class PositionedMarker(
+    val markerData: MarkerData,
+    val adjustedPosition: LatLng
+)
+
+// Helper functions for marker spacing
+private fun calculateDistance(pos1: LatLng, pos2: LatLng): Double {
+    val earthRadius = 6371000.0 // Earth radius in meters
+    val lat1Rad = Math.toRadians(pos1.latitude)
+    val lat2Rad = Math.toRadians(pos2.latitude)
+    val deltaLatRad = Math.toRadians(pos2.latitude - pos1.latitude)
+    val deltaLngRad = Math.toRadians(pos2.longitude - pos1.longitude)
+    
+    val a = sin(deltaLatRad / 2).pow(2) + cos(lat1Rad) * cos(lat2Rad) * sin(deltaLngRad / 2).pow(2)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    
+    return earthRadius * c
+}
+
+private fun groupNearbyMarkers(markers: List<MarkerData>): List<List<MarkerData>> {
+    val groups = mutableListOf<MutableList<MarkerData>>()
+    val processed = mutableSetOf<String>()
+    
+    for (marker in markers) {
+        if (marker.id in processed) continue
+        
+        val group = mutableListOf(marker)
+        processed.add(marker.id)
+        
+        for (otherMarker in markers) {
+            if (otherMarker.id in processed) continue
+            
+            val distance = calculateDistance(marker.position, otherMarker.position)
+            if (distance <= MARKER_PROXIMITY_THRESHOLD_METERS) {
+                group.add(otherMarker)
+                processed.add(otherMarker.id)
+            }
+        }
+        
+        groups.add(group)
+    }
+    
+    return groups
+}
+
+private fun calculateMarkerOffsets(group: List<MarkerData>): List<PositionedMarker> {
+    if (group.size == 1) {
+        return listOf(PositionedMarker(group[0], group[0].position))
+    }
+    
+    val centerLat = group.map { it.position.latitude }.average()
+    val centerLng = group.map { it.position.longitude }.average()
+    
+    return group.mapIndexed { index, marker ->
+        if (group.size == 2) {
+            // For 2 markers, place them on opposite sides
+            val offset = MARKER_OFFSET_DISTANCE_DEGREES * MARKER_OFFSET_MULTIPLIER
+            val adjustedPosition = when (index) {
+                0 -> LatLng(centerLat - offset, centerLng)
+                else -> LatLng(centerLat + offset, centerLng)
+            }
+            PositionedMarker(marker, adjustedPosition)
+        } else {
+            // For 3+ markers, arrange in circle
+            val angleStep = 2 * PI / group.size
+            val angle = angleStep * index
+            val radius = MARKER_OFFSET_DISTANCE_DEGREES * MARKER_OFFSET_MULTIPLIER
+            
+            val offsetLat = centerLat + radius * cos(angle)
+            val offsetLng = centerLng + radius * sin(angle)
+            val adjustedPosition = LatLng(offsetLat, offsetLng)
+            
+            PositionedMarker(marker, adjustedPosition)
+        }
+    }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MapScreen(
     navController: NavController,
@@ -170,6 +279,7 @@ fun MapScreen(
     val userStatus by viewModel.userStatus.collectAsStateWithLifecycle()
     val shouldShowBatteryOnMap by viewModel.shouldShowBatteryOnMap.collectAsStateWithLifecycle()
     val isLocationSharingPreferred by viewModel.isLocationSharingPreferred.collectAsStateWithLifecycle()
+    val friendLocations by viewModel.friendLocations.collectAsStateWithLifecycle()
 
     var locationPermissionGrantedState by remember { mutableStateOf(false) }
     var showPermissionRationaleDialog by remember { mutableStateOf(false) }
@@ -215,7 +325,9 @@ fun MapScreen(
         // isLocationSharingPreferredSetting is NO LONGER passed here.
         // The effect's job is to get location if permissions are met for local display.
         // ViewModel handles backend sharing based on the preference.
-        onLocationUpdate = { newLocation -> viewModel.updateLocation(newLocation) },
+        onLocationUpdate = { newLocation -> 
+            viewModel.updateLocation(newLocation)
+        },
         onUiMessage = { message -> uiMessage = message },
         onShowLocationDisabledAlert = { showLocationDisabledAlert = it }
     )
@@ -241,7 +353,9 @@ fun MapScreen(
             batteryPercentage = batteryPercentage,
             userStatus = userStatus,
             shouldShowBattery = shouldShowBatteryOnMap,
-            isLocationSharingPreferred = isLocationSharingPreferred // For marker icon
+            isLocationSharingPreferred = isLocationSharingPreferred, // For marker icon
+            friendLocations = friendLocations,
+            viewModel = viewModel
         )
         BottomNavBar(navController = navController, currentRoute = "map")
     }
@@ -330,7 +444,9 @@ private fun MapArea(
     batteryPercentage: Int,
     userStatus: String,
     shouldShowBattery: Boolean,
-    isLocationSharingPreferred: Boolean
+    isLocationSharingPreferred: Boolean,
+    friendLocations: List<com.familystalking.app.domain.model.FamilyMemberLocation>,
+    viewModel: MapViewModel
 ) {
     Box(modifier = modifier.fillMaxWidth()) {
         val cameraPositionState = rememberCameraPositionState {
@@ -346,15 +462,75 @@ private fun MapArea(
             properties = MapProperties(isMyLocationEnabled = false),
             uiSettings = MapUiSettings(myLocationButtonEnabled = true, zoomControlsEnabled = false)
         ) {
+            // Collect all markers
+            val allMarkers = mutableListOf<MarkerData>()
+            
+            // Add user marker if available
             currentMapLatLng?.let { validLatLng ->
-                UserMarker(
-                    position = validLatLng,
-                    batteryPercentage = batteryPercentage,
-                    userStatus = userStatus,
-                    initials = "OP",
-                    shouldShowBattery = shouldShowBattery,
-                    isSharingLocation = isLocationSharingPreferred
+                allMarkers.add(
+                    MarkerData(
+                        id = "user",
+                        position = validLatLng,
+                        type = MarkerType.User(
+                            batteryPercentage = batteryPercentage,
+                            userStatus = userStatus,
+                            initials = viewModel.getCurrentUserInitials(),
+                            shouldShowBattery = shouldShowBattery,
+                            isSharingLocation = isLocationSharingPreferred
+                        )
+                    )
                 )
+            }
+            
+            // Add friend markers
+            friendLocations.forEach { friendLocation ->
+                val friendLatLng = LatLng(
+                    friendLocation.location.latitude,
+                    friendLocation.location.longitude
+                )
+                allMarkers.add(
+                    MarkerData(
+                        id = "friend_${friendLocation.userId}",
+                        position = friendLatLng,
+                        type = MarkerType.Friend(
+                            friendName = friendLocation.name,
+                            initials = viewModel.getFriendInitials(friendLocation.name),
+                            friendLocation = friendLocation,
+                            shouldShowBattery = shouldShowBattery
+                        )
+                    )
+                )
+            }
+            
+            // Group nearby markers and calculate offsets
+            val markerGroups = groupNearbyMarkers(allMarkers)
+            val positionedMarkers = markerGroups.flatMap { group ->
+                calculateMarkerOffsets(group)
+            }
+            
+            // Render positioned markers
+            positionedMarkers.forEach { positionedMarker ->
+                when (val markerType = positionedMarker.markerData.type) {
+                    is MarkerType.User -> {
+                        UserMarker(
+                            position = positionedMarker.adjustedPosition,
+                            batteryPercentage = markerType.batteryPercentage,
+                            userStatus = "Myself", // Changed from markerType.userStatus
+                            initials = markerType.initials,
+                            shouldShowBattery = markerType.shouldShowBattery,
+                            isSharingLocation = markerType.isSharingLocation
+                        )
+                    }
+                    is MarkerType.Friend -> {
+                        FriendMarker(
+                            position = positionedMarker.adjustedPosition,
+                            friendName = markerType.friendName,
+                            initials = markerType.initials,
+                            friendLocation = markerType.friendLocation,
+                            shouldShowBattery = markerType.shouldShowBattery
+                        )
+                    }
+                }
             }
         }
     }
@@ -405,23 +581,79 @@ private fun UserMarker(
         anchor = Offset(MARKER_ANCHOR_X, MARKER_ANCHOR_Y)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(MARKER_ELEMENT_SPACING_DP)
-            ) {
-                if (shouldShowBattery) {
-                    BatteryIndicator(batteryPercentage = batteryPercentage)
-                }
-                Icon(
-                    imageVector = if (isSharingLocation) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = if (isSharingLocation) "Location Sharing ON" else "Location Sharing OFF",
-                    tint = if (isSharingLocation) MaterialTheme.colorScheme.primary else Color.Gray,
-                    modifier = Modifier.size(SHARING_ICON_SIZE_DP)
-                )
+            // Eye icon above battery
+            Icon(
+                imageVector = if (isSharingLocation) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                contentDescription = if (isSharingLocation) "Location Sharing ON" else "Location Sharing OFF",
+                tint = if (isSharingLocation) MaterialTheme.colorScheme.primary else Color.Gray,
+                modifier = Modifier.size(SHARING_ICON_SIZE_DP)
+            )
+            
+            // Battery below eye (if enabled)
+            if (shouldShowBattery) {
+                Spacer(modifier = Modifier.height(2.dp))
+                BatteryIndicator(batteryPercentage = batteryPercentage)
             }
+            
             Spacer(modifier = Modifier.height(4.dp))
             ProfileMarker(initials = initials)
             StatusIndicator(status = userStatus)
+        }
+    }
+}
+
+@Composable
+private fun FriendMarker(
+    position: LatLng,
+    friendName: String,
+    initials: String,
+    friendLocation: com.familystalking.app.domain.model.FamilyMemberLocation,
+    shouldShowBattery: Boolean
+) {
+    MarkerComposable(
+        keys = arrayOf(friendName, position, friendLocation.location.timestamp),
+        state = MarkerState(position = position),
+        anchor = Offset(MARKER_ANCHOR_X, MARKER_ANCHOR_Y)
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Show time banner if location is stale
+            if (friendLocation.isLocationStale()) {
+                Card(
+                    modifier = Modifier.offset(y = (-32).dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.9f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
+                    Text(
+                        text = friendLocation.getFormattedTimeSinceUpdate(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+            
+            // Eye icon above battery for friends
+            Icon(
+                imageVector = Icons.Filled.Visibility,
+                contentDescription = "Friend Location",
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(SHARING_ICON_SIZE_DP)
+            )
+            
+            // Show battery if available (below eye icon)
+            friendLocation.location.batteryLevel?.let { batteryLevel ->
+                if (shouldShowBattery) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    BatteryIndicator(batteryPercentage = batteryLevel)
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(4.dp))
+            ProfileMarker(initials = initials)
+            StatusIndicator(status = friendName)
         }
     }
 }
