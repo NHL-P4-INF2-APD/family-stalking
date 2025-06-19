@@ -49,6 +49,7 @@ fun AgendaScreen(
 ) {
     val agendaItems by viewModel.agendaItems.collectAsState()
     val selectedItem by viewModel.selectedAgendaItem.collectAsState()
+    val loading by viewModel.loading.collectAsState()
 
     Scaffold(
         floatingActionButton = {
@@ -78,6 +79,19 @@ fun AgendaScreen(
                 .padding(paddingValues)
                 .padding(horizontal = GLOBAL_PADDING, vertical = VERTICAL_ITEM_SPACING)
         ) {
+            // RELOAD BUTTON
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Button(
+                    onClick = { viewModel.fetchAgendaItems() },
+                    enabled = !loading
+                ) {
+                    Text("Reload")
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             if (agendaItems.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),

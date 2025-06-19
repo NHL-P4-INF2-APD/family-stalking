@@ -52,11 +52,14 @@ class AgendaViewModel @Inject constructor(
                 if (userId != null) {
                     val events = agendaRepository.getEventsForUser(userId)
                     _agendaItems.value = events
+                    println("[DEBUG] fetchAgendaItems: opgehaald aantal events = ${events.size}")
                 } else {
                     _agendaItems.value = emptyList()
+                    println("[DEBUG] fetchAgendaItems: userId is null, geen events opgehaald")
                 }
             } catch (e: Exception) {
                 _error.value = "Fout bij ophalen van agenda: ${e.message}"
+                println("[ERROR] Fout bij ophalen van agenda: ${e.message}")
             } finally {
                 _loading.value = false
             }
