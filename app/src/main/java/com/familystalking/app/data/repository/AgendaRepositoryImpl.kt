@@ -19,7 +19,7 @@ data class CalendarEventRow(
     val title: String,
     val description: String?,
     @SerialName("start_time") val startTime: String,
-    @SerialName("end_time") val endTime: String?,
+    @SerialName("end_time") val endTime: String,
     val location: String?,
     @SerialName("created_by") val createdBy: String
 )
@@ -35,16 +35,39 @@ class AgendaRepositoryImpl @Inject constructor(
     private val supabaseClient: SupabaseClient
 ) : AgendaRepository {
     override suspend fun getEventsForUser(userId: String): List<Event> {
-        // Haal alle event_ids op waar user attendee is
-        val attendeeRows = supabaseClient.from("event_attendees").select {
-            filter { eq("user_id", userId) }
-        }.decodeList<EventAttendeeRow>()
-        val eventIds = attendeeRows.map { it.eventId }
-        if (eventIds.isEmpty()) return emptyList()
-        // Haal alle events op voor deze eventIds
-        val eventRows = supabaseClient.from("calendar_events").select {
-            filter { isIn("calendar_id", eventIds) }
-        }.decodeList<CalendarEventRow>()
+        println("[DEBUG] getEventsForUser called for userId: $userId")
+        
+        // Haal alle calendar_ids op waar user attendee is
+        val attendeeRows = try {
+            supabaseClient.from("event_attendees").select {
+                filter { eq("user_id", userId) }
+            }.decodeList<EventAttendeeRow>()
+        } catch (e: Exception) {
+            println("[ERROR] Fout bij ophalen event_attendees: ${e.message}")
+            return emptyList()
+        }
+        
+        println("[DEBUG] Found ${attendeeRows.size} attendee rows")
+        val calendarIds = attendeeRows.map { it.eventId }
+        println("[DEBUG] Calendar IDs to lookup: $calendarIds")
+        
+        if (calendarIds.isEmpty()) {
+            println("[DEBUG] No calendar IDs found, returning empty list")
+            return emptyList()
+        }
+        
+        // Haal alle events op voor deze calendarIds
+        val eventRows = try {
+            supabaseClient.from("calendar_events").select {
+                filter { isIn("calendar_id", calendarIds) }
+            }.decodeList<CalendarEventRow>()
+        } catch (e: Exception) {
+            println("[ERROR] Fout bij ophalen calendar_events: ${e.message}")
+            return emptyList()
+        }
+        
+        println("[DEBUG] Found ${eventRows.size} event rows")
+        
         return eventRows.map { row ->
             val attendees = getEventAttendees(row.calendarId)
             Event(
@@ -52,7 +75,7 @@ class AgendaRepositoryImpl @Inject constructor(
                 title = row.title,
                 description = row.description,
                 startTime = LocalDateTime.parse(row.startTime),
-                endTime = row.endTime?.let { LocalDateTime.parse(it) },
+                endTime = LocalDateTime.parse(row.endTime),
                 location = row.location,
                 createdBy = row.createdBy,
                 participants = attendees.map { it.name }
@@ -61,29 +84,34 @@ class AgendaRepositoryImpl @Inject constructor(
     }
 
     override suspend fun addEvent(event: Event, attendees: List<EventAttendee>) {
-        // Voeg event toe
-        val eventInsertResponse = supabaseClient.from("calendar_events").insert(
-            CalendarEventRow(
-                calendarId = event.id,
-                familyId = null, // optioneel, afhankelijk van je app
-                title = event.title,
-                description = event.description,
-                startTime = event.startTime.toString(),
-                endTime = event.endTime?.toString(),
-                location = event.location,
-                createdBy = event.createdBy
-            )
-        )
-        println("[DEBUG] Event insert response: $eventInsertResponse")
-        // Voeg alle attendees toe
-        attendees.forEach { attendee ->
-            val attendeeInsertResponse = supabaseClient.from("event_attendees").insert(
-                EventAttendeeRow(
-                    eventId = event.id,
-                    userId = attendee.userId
+        try {
+            // Voeg event toe
+            val eventInsertResponse = supabaseClient.from("calendar_events").insert(
+                CalendarEventRow(
+                    calendarId = event.id,
+                    familyId = null, // optioneel, afhankelijk van je app
+                    title = event.title,
+                    description = event.description,
+                    startTime = event.startTime.toString(),
+                    endTime = event.endTime.toString(),
+                    location = event.location,
+                    createdBy = event.createdBy
                 )
             )
-            println("[DEBUG] Attendee insert response: $attendeeInsertResponse")
+            println("[DEBUG] Event insert response: $eventInsertResponse")
+            // Voeg alle attendees toe
+            attendees.forEach { attendee ->
+                val attendeeInsertResponse = supabaseClient.from("event_attendees").insert(
+                    EventAttendeeRow(
+                        eventId = event.id,
+                        userId = attendee.userId
+                    )
+                )
+                println("[DEBUG] Attendee insert response: $attendeeInsertResponse")
+            }
+        } catch (e: Exception) {
+            println("[ERROR] Fout bij toevoegen van event of attendees: ${e.message}")
+            throw e
         }
     }
 
@@ -103,7 +131,7 @@ class AgendaRepositoryImpl @Inject constructor(
         }
     }
 
-    private suspend fun getUserEmail(userId: String): String? {
+    override suspend fun getUserEmail(userId: String): String? {
         // Haal e-mail op uit users tabel
         val users = supabaseClient.from("users").select {
             filter { eq("user_id", userId) }

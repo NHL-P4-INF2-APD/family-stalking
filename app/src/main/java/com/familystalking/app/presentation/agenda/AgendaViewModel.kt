@@ -16,6 +16,11 @@ import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import javax.inject.Inject
 import java.util.UUID
+import android.util.Log
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.datetime.DateTimePeriod
 
 @HiltViewModel
 class AgendaViewModel @Inject constructor(
@@ -73,28 +78,33 @@ class AgendaViewModel @Inject constructor(
                 val userId = authRepository.getCurrentUserId() ?: return@launch
                 val eventId = UUID.randomUUID().toString()
                 val startDateTime = LocalDateTime(date.year, date.monthNumber, date.dayOfMonth, time.hour, time.minute)
+                // Set endTime to 1 hour after startTime to satisfy the valid_time_range constraint
+                val endHour = (time.hour + 1) % 24
+                val endDateTime = LocalDateTime(date.year, date.monthNumber, date.dayOfMonth, endHour, time.minute)
+                
                 val event = Event(
                     id = eventId,
                     title = title,
                     description = description,
                     startTime = startDateTime,
-                    endTime = null,
+                    endTime = endDateTime,
                     location = location,
                     createdBy = userId,
-                    participants = emptyList() // wordt gevuld na ophalen
+                    participants = emptyList()
                 )
-                // Voeg attendees toe: aanmaker + geselecteerde userIds
                 val allUserIds = (participants + userId).distinct()
                 val attendees = allUserIds.map { uid ->
-                    val email = getUserEmail(uid)
-                    val name = email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Onbekend"
-                    EventAttendee(eventId = eventId, userId = uid, name = name)
+                    EventAttendee(eventId = eventId, userId = uid, name = uid)
                 }
                 println("[DEBUG] addEvent called with event: $event, attendees: $attendees")
+                println("[DEBUG] Attempting to add event to Supabase...")
                 agendaRepository.addEvent(event, attendees)
+                println("[DEBUG] Event added to Supabase!")
                 fetchAgendaItems()
             } catch (e: Exception) {
+                e.printStackTrace()
                 _error.value = "Fout bij toevoegen van event: ${e.message}"
+                println("[ERROR] Fout bij toevoegen van event: ${e.message}")
             } finally {
                 _loading.value = false
             }
@@ -102,16 +112,7 @@ class AgendaViewModel @Inject constructor(
     }
 
     private suspend fun getUserEmail(userId: String): String? {
-        // Simpele Supabase query naar users tabel
-        // (zelfde als in AgendaRepositoryImpl)
-        return try {
-            val users = agendaRepository.javaClass.getDeclaredMethod("getUserEmail", String::class.java)
-                .apply { isAccessible = true }
-                .invoke(agendaRepository, userId) as? String
-            users
-        } catch (e: Exception) {
-            null
-        }
+        return null
     }
 
     fun onAgendaItemClick(item: Event) {

@@ -9,7 +9,7 @@ data class Event(
     val title: String,
     val description: String?,
     val startTime: LocalDateTime,
-    val endTime: LocalDateTime?,
+    val endTime: LocalDateTime,
     val location: String?,
     val createdBy: String, // user_id van aanmaker
     val participants: List<String> // lijst van namen
