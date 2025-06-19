@@ -14,7 +14,7 @@ import javax.inject.Inject
 
 @Serializable
 data class CalendarEventRow(
-    @SerialName("calendar_id") val id: String,
+    @SerialName("calendar_id") val calendarId: String,
     @SerialName("family_id") val familyId: String?,
     val title: String,
     val description: String?,
@@ -46,9 +46,9 @@ class AgendaRepositoryImpl @Inject constructor(
             filter { isIn("calendar_id", eventIds) }
         }.decodeList<CalendarEventRow>()
         return eventRows.map { row ->
-            val attendees = getEventAttendees(row.id)
+            val attendees = getEventAttendees(row.calendarId)
             Event(
-                id = row.id,
+                id = row.calendarId,
                 title = row.title,
                 description = row.description,
                 startTime = LocalDateTime.parse(row.startTime),
@@ -62,9 +62,9 @@ class AgendaRepositoryImpl @Inject constructor(
 
     override suspend fun addEvent(event: Event, attendees: List<EventAttendee>) {
         // Voeg event toe
-        supabaseClient.from("calendar_events").insert(
+        val eventInsertResponse = supabaseClient.from("calendar_events").insert(
             CalendarEventRow(
-                id = event.id,
+                calendarId = event.id,
                 familyId = null, // optioneel, afhankelijk van je app
                 title = event.title,
                 description = event.description,
@@ -74,14 +74,16 @@ class AgendaRepositoryImpl @Inject constructor(
                 createdBy = event.createdBy
             )
         )
+        println("[DEBUG] Event insert response: $eventInsertResponse")
         // Voeg alle attendees toe
         attendees.forEach { attendee ->
-            supabaseClient.from("event_attendees").insert(
+            val attendeeInsertResponse = supabaseClient.from("event_attendees").insert(
                 EventAttendeeRow(
                     eventId = event.id,
                     userId = attendee.userId
                 )
             )
+            println("[DEBUG] Attendee insert response: $attendeeInsertResponse")
         }
     }
 

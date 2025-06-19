@@ -43,6 +43,9 @@ abstract class RepositoryModule {
     abstract fun bindAgendaRepository(
         agendaRepositoryImpl: AgendaRepositoryImpl
     ): AgendaRepository
+
+    @Binds
+    @Singleton
     abstract fun bindLocationRepository(
         supabaseLocationRepository: SupabaseLocationRepository
     ): LocationRepository

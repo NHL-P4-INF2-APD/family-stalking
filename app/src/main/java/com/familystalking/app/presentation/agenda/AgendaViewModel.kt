@@ -90,6 +90,7 @@ class AgendaViewModel @Inject constructor(
                     val name = email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Onbekend"
                     EventAttendee(eventId = eventId, userId = uid, name = name)
                 }
+                println("[DEBUG] addEvent called with event: $event, attendees: $attendees")
                 agendaRepository.addEvent(event, attendees)
                 fetchAgendaItems()
             } catch (e: Exception) {
