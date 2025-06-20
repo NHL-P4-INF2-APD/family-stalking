@@ -123,14 +123,6 @@ app/src/main/java/com/familystalking/app/
 | ------------------------- | ------ | -------------------------- |
 | **DataStore Preferences** | 1.0.0  | Type-veilige lokale opslag |
 
-### Code Kwaliteit & Testing
-
-| Technologie | Versie   | Doel                    |
-| ----------- | -------- | ----------------------- |
-| **ktlint**  | 0.49.1   | Code formatting         |
-| **JaCoCo**  | Built-in | Code coverage reporting |
-| **JUnit**   | 4.13.2   | Unit testing            |
-
 ---
 
 ## 📊 Database Schema
@@ -298,8 +290,6 @@ Zorg ervoor dat je het volgende geïnstalleerd hebt:
 
 ---
 
-## 🧪 Code Kwaliteit & Testing
-
 **Code Style Handhaving:**
 
 - 4-spatie inspringing
@@ -307,33 +297,6 @@ Zorg ervoor dat je het volgende geïnstalleerd hebt:
 - Kotlin officiële code conventies
 - Geen wildcard imports
 - Consistente naamgevingsconventies
-
-### Testing
-
-**Unit Tests:**
-
-```bash
-# Voer alle unit tests uit
-./gradlew testDebugUnitTest
-
-# Voer uit met coverage
-./gradlew coverage
-```
-
-**Code Coverage:**
-
-- **JaCoCo** integratie voor uitgebreide coverage rapporten
-- Sluit auto-gegenereerde bestanden uit (R.class, BuildConfig, etc.)
-- HTML en XML rapporten gegenereerd in `app/build/reports/`
-
-### Kwaliteitspoorten
-
-Het project handhaaft:
-
-- **Minimum code coverage**: Configureerbare drempelwaarde
-- **Nul kritieke Detekt overtredingen**
-- **Alle unit tests slagen**
-- **Juiste ktlint formatting**
 
 ---
 
@@ -343,27 +306,10 @@ Het project handhaaft:
 
 De geautomatiseerde pipeline omvat:
 
-1. **Code Kwaliteitscontroles**
-
-   - Detekt statische analyse
-   - ktlint formatting verificatie
-   - Unit test uitvoering
-
-2. **Build Proces**
+1. **Build Proces**
 
    - Gradle build verificatie
    - APK generatie voor releases
-
-3. **Testing**
-
-   - Unit test uitvoering
-   - Code coverage rapportage
-   - Integratie test uitvoering
-
-4. **Artifacts**
-   - Debug/Release APK bestanden
-   - Test rapporten
-   - Coverage rapporten
 
 ### Release Proces
 
@@ -495,7 +441,7 @@ Vereiste Android permissies:
 ## 📞 Project Links
 
 - 📚 **Documentatie**: Deze README en inline code documentatie
-- 🔄 **CI/CD**: GitHub Actions voor geautomatiseerde builds en testing
+- 🔄 **CI/CD**: GitHub Actions voor geautomatiseerde builds
 
 ---
 
@@ -508,6 +454,5 @@ Vereiste Android permissies:
 **Project Type**: Team-gebaseerde software ontwikkeling met nadruk op:
 
 - Scrum ontwikkelingsmethodologieën
-- Code kwaliteit en test praktijken
 - Professionele ontwikkelingsworkflows
 - Moderne Android ontwikkelingstechnieken
