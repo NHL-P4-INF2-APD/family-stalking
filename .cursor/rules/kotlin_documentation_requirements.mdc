@@ -1,9 +1,0 @@
----
-description: helpful for understanding project Kotlin Documentation Requirements
-globs: 
-alwaysApply: false
----
-# Kotlin Documentation Requirements
-
-*   All public and protected classes, functions, and parameters must be documented using KDoc.
-*   Documentation must be clear, concise, and accurate.
