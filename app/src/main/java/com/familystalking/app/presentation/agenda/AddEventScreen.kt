@@ -5,6 +5,8 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -13,6 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.People
@@ -80,6 +84,7 @@ fun AddEventScreen(
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showParticipantsDropdown by remember { mutableStateOf(false) }
 
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -196,34 +201,67 @@ fun AddEventScreen(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            
             if (familyState.isLoading) {
                 CircularProgressIndicator()
             } else if (friends.isEmpty()) {
                 Text("Geen vrienden gevonden", color = Color.Red)
             } else {
-                Column {
-                    friends.forEach { friend ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (selectedParticipants.contains(friend.id)) {
-                                        selectedParticipants.remove(friend.id)
+                // Show selected participants as chips
+                if (selectedParticipants.isNotEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        items(selectedParticipants) { participantId ->
+                            val friend = friends.find { it.id == participantId }
+                            friend?.let {
+                                ParticipantChip(
+                                    name = it.name,
+                                    onRemove = { selectedParticipants.remove(participantId) }
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Dropdown to add participants
+                ExposedDropdownMenuBox(
+                    expanded = showParticipantsDropdown,
+                    onExpandedChange = { showParticipantsDropdown = it }
+                ) {
+                    OutlinedTextField(
+                        value = if (selectedParticipants.isEmpty()) "Selecteer deelnemers" else "${selectedParticipants.size} deelnemer(s) geselecteerd",
+                        onValueChange = { },
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showParticipantsDropdown) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        leadingIcon = { Icon(Icons.Outlined.People, contentDescription = "Participants icon") }
+                    )
+                    
+                    ExposedDropdownMenu(
+                        expanded = showParticipantsDropdown,
+                        onDismissRequest = { showParticipantsDropdown = false }
+                    ) {
+                        friends.forEach { friend ->
+                            val isSelected = selectedParticipants.contains(friend.id)
+                            DropdownMenuItem(
+                                text = { Text(friend.name) },
+                                onClick = {
+                                    if (isSelected) {
+                                        friend.id?.let { selectedParticipants.remove(it) }
                                     } else {
                                         friend.id?.let { selectedParticipants.add(it) }
                                     }
-                                }
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Checkbox(
-                                checked = selectedParticipants.contains(friend.id),
-                                onCheckedChange = {
-                                    if (it) friend.id?.let { id -> selectedParticipants.add(id) }
-                                    else friend.id?.let { id -> selectedParticipants.remove(id) }
+                                },
+                                leadingIcon = {
+                                    if (isSelected) {
+                                        Icon(Icons.Filled.Add, contentDescription = "Selected")
+                                    }
                                 }
                             )
-                            Text(friend.name)
                         }
                     }
                 }
@@ -290,6 +328,41 @@ fun AddEventScreen(
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } }
         ) {
             TimePicker(state = timePickerState, modifier = Modifier.padding(16.dp))
+        }
+    }
+}
+
+@Composable
+fun ParticipantChip(
+    name: String,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(16.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Remove $name",
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     }
 }
