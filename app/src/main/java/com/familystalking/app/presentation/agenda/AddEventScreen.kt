@@ -5,6 +5,8 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -13,6 +15,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.People
@@ -43,6 +47,15 @@ import kotlinx.datetime.toKotlinLocalDate
 import kotlinx.datetime.todayIn
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.familystalking.app.presentation.family.FamilyMember
+import com.familystalking.app.domain.repository.FamilyRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import com.familystalking.app.presentation.family.FamilyViewModel
+import androidx.compose.runtime.getValue
 
 private val CREATE_EVENT_BUTTON_COLOR = Color(0xFF66BB6A)
 
@@ -51,18 +64,27 @@ private val CREATE_EVENT_BUTTON_COLOR = Color(0xFF66BB6A)
 @Composable
 fun AddEventScreen(
     navController: NavController,
-    viewModel: AgendaViewModel = hiltViewModel()
+    viewModel: AgendaViewModel = hiltViewModel(),
+    familyViewModel: FamilyViewModel = hiltViewModel()
 ) {
     var eventTitle by remember { mutableStateOf("") }
     val today = Clock.System.todayIn(TimeZone.currentSystemDefault())
     var selectedDate by remember { mutableStateOf(today) }
     var selectedTime by remember { mutableStateOf(LocalTime(12, 0)) }
     var location by remember { mutableStateOf("") }
-    var currentParticipant by remember { mutableStateOf("") }
-    val participants = remember { mutableStateListOf<String>() }
+    val selectedParticipants = remember { mutableStateListOf<String>() } // userIds
+    val familyState by familyViewModel.state.collectAsState()
+    val friends = familyState.familyMembers
+
+    LaunchedEffect(Unit) {
+        if (friends.isEmpty()) {
+            familyViewModel.fetchFamilyMembers()
+        }
+    }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    var showParticipantsDropdown by remember { mutableStateOf(false) }
 
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -175,49 +197,72 @@ fun AddEventScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                "Participants",
+                "Deelnemers",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant // Consistent label color
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
-                    value = currentParticipant,
-                    onValueChange = { currentParticipant = it },
-                    placeholder = { Text("Add participants") },
-                    modifier = Modifier.weight(1f),
-                    leadingIcon = { Icon(Icons.Outlined.People, contentDescription = "Participants icon") },
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = {
-                        if (currentParticipant.isNotBlank()) {
-                            participants.add(currentParticipant.trim())
-                            currentParticipant = ""
-                            keyboardController?.hide()
+            
+            if (familyState.isLoading) {
+                CircularProgressIndicator()
+            } else if (friends.isEmpty()) {
+                Text("Geen vrienden gevonden", color = Color.Red)
+            } else {
+                // Show selected participants as chips
+                if (selectedParticipants.isNotEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
+                        items(selectedParticipants) { participantId ->
+                            val friend = friends.find { it.id == participantId }
+                            friend?.let {
+                                ParticipantChip(
+                                    name = it.name,
+                                    onRemove = { selectedParticipants.remove(participantId) }
+                                )
+                            }
                         }
-                    })
-                )
-                IconButton(onClick = {
-                    if (currentParticipant.isNotBlank()) {
-                        participants.add(currentParticipant.trim())
-                        currentParticipant = ""
-                        keyboardController?.hide()
                     }
-                }, enabled = currentParticipant.isNotBlank()) {
-                    Icon(Icons.Filled.Add, contentDescription = "Add participant")
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-
-            if (participants.isNotEmpty()) {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth()
+                
+                // Dropdown to add participants
+                ExposedDropdownMenuBox(
+                    expanded = showParticipantsDropdown,
+                    onExpandedChange = { showParticipantsDropdown = it }
                 ) {
-                    participants.forEach { name ->
-                        ParticipantTag( // Ensure ParticipantTag is accessible and accepts modifier
-                            name = name,
-                            onRemove = { participants.remove(name) },
-                            showRemoveIcon = true,
-                            modifier = Modifier.padding(end = 8.dp, bottom = 8.dp)
-                        )
+                    OutlinedTextField(
+                        value = if (selectedParticipants.isEmpty()) "Selecteer deelnemers" else "${selectedParticipants.size} deelnemer(s) geselecteerd",
+                        onValueChange = { },
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showParticipantsDropdown) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                        leadingIcon = { Icon(Icons.Outlined.People, contentDescription = "Participants icon") }
+                    )
+                    
+                    ExposedDropdownMenu(
+                        expanded = showParticipantsDropdown,
+                        onDismissRequest = { showParticipantsDropdown = false }
+                    ) {
+                        friends.forEach { friend ->
+                            val isSelected = selectedParticipants.contains(friend.id)
+                            DropdownMenuItem(
+                                text = { Text(friend.name) },
+                                onClick = {
+                                    if (isSelected) {
+                                        friend.id?.let { selectedParticipants.remove(it) }
+                                    } else {
+                                        friend.id?.let { selectedParticipants.add(it) }
+                                    }
+                                },
+                                leadingIcon = {
+                                    if (isSelected) {
+                                        Icon(Icons.Filled.Add, contentDescription = "Selected")
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -231,8 +276,8 @@ fun AddEventScreen(
                             date = selectedDate,
                             time = selectedTime,
                             location = location.takeIf { it.isNotBlank() },
-                            participants = participants.toList(),
-                            description = "New event: $eventTitle" // Or a dedicated description field
+                            participants = selectedParticipants.toList(),
+                            description = "New event: $eventTitle"
                         )
                         navController.popBackStack()
                     }
@@ -283,6 +328,41 @@ fun AddEventScreen(
             dismissButton = { TextButton(onClick = { showTimePicker = false }) { Text("Cancel") } }
         ) {
             TimePicker(state = timePickerState, modifier = Modifier.padding(16.dp))
+        }
+    }
+}
+
+@Composable
+fun ParticipantChip(
+    name: String,
+    onRemove: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.padding(vertical = 4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = name,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            IconButton(
+                onClick = onRemove,
+                modifier = Modifier.size(16.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Close,
+                    contentDescription = "Remove $name",
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
         }
     }
 }
