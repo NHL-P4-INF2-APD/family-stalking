@@ -1,4 +1,4 @@
-# Family Stalking - APP Ontwikkeling
+# Family Stalking - App Development
 
 <h1 align="center">
   <a href="https://www.nhlstenden.com/"><img src="nhl.png" alt="NHL Logo" height="150"></a>
